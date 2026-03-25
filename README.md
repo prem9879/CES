@@ -129,7 +129,7 @@ The self-hosted API server includes an opt-in Open Research Dataset feature. Whe
     This feature is OFF by default and requires explicit consent via a warning modal
     Automatic PII scrubbing runs on all entries (emails, phone numbers, SSNs, credit cards, IPs, API keys) but is NOT guaranteed to catch everything
     Do NOT include personal information, real names, passwords, or anything you wouldn't want public
-    This feature does NOT exist on the hosted site (g0dm0d3.com) — it only applies when opted-in while running the full API server via Docker
+    This feature does NOT exist on the hosted site (godmod3.ai) — it only applies when opted-in while running the full API server via Docker
 
 See [TERMS.md](TERMS.md) for the full three-tier data transparency policy.
 

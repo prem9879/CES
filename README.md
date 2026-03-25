@@ -9,7 +9,7 @@
  ───────────────────────────────────────────────────────────
 ```
 
-LINK: GODMOD3.AI
+[GODMOD3 Website](godmod3.ai).
 
 G0DM0D3 is a fully open-source, privacy-respecting, multi-model chat interface that pushes the limits of the post-training layer — for red teaming, cognition research, and liberated AI interaction. Built for hackers, philosophers, and system tinkerers.
 

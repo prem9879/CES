@@ -122,6 +122,15 @@ G0DM0D3 takes privacy seriously:
 - ✅ All telemetry code is instantly open-source and auditable on Hugging Face dataset
 - ✅ AGPL-3.0 — verify the code yourself
 
+⚠️ OPEN RESEARCH DATASET (API Server Only — does NOT apply to godmod3.ai)
+
+The self-hosted API server includes an opt-in Open Research Dataset feature. When you enable "Dataset Generation" in Settings → Privacy, ALL of your chat inputs and model outputs will be automatically published to a public HuggingFace dataset for AI research. This data is public, downloadable by anyone, and may be cached, forked, or redistributed.
+
+    This feature is OFF by default and requires explicit consent via a warning modal
+    Automatic PII scrubbing runs on all entries (emails, phone numbers, SSNs, credit cards, IPs, API keys) but is NOT guaranteed to catch everything
+    Do NOT include personal information, real names, passwords, or anything you wouldn't want public
+    This feature does NOT exist on the hosted site (g0dm0d3.com) — it only applies when opted-in while running the full API server via Docker
+
 See [TERMS.md](TERMS.md) for the full three-tier data transparency policy.
 
 ### Chat History & Self-Custody

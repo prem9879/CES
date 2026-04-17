@@ -53,7 +53,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed md:relative z-40 h-dvh
+          fixed md:shrink-0 md:sticky md:top-0 z-40 h-screen
           bg-theme-dim border-r border-theme-primary
           transition-all duration-300 ease-in-out
           ${isOpen ? 'w-72' : 'w-0'}

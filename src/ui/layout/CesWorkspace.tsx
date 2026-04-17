@@ -11,12 +11,12 @@ export function CesWorkspace() {
   const { showSettings, setShowSettings, sidebarOpen, setSidebarOpen } = useStore()
 
   return (
-    <div className="ces-shell h-dvh w-full overflow-hidden bg-ice-gradient text-cyan-100">
+    <div className="ces-shell h-screen w-full overflow-hidden bg-ice-gradient text-cyan-100">
       <CommandPalette />
       <FirstRunOnboarding />
-      <div className="ces-layer grid h-full min-h-0 grid-cols-[0_minmax(0,1fr)] md:grid-cols-[288px_minmax(0,1fr)] md:grid-rows-1">
+      <div className="ces-layer flex h-full min-h-0">
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <div className="ces-reveal h-full min-h-0 min-w-0">
+        <div className="ces-reveal flex-1 h-full min-h-0 min-w-0">
           <ChatArea />
         </div>
       </div>

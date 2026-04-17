@@ -29,6 +29,24 @@ CES is built as a complete operating system for AI product delivery:
 - Enterprise evidence APIs and admin dashboard
 - Support, privacy, terms, and offline surfaces
 
+## Architecture At A Glance
+
+CES is organized into four practical layers:
+- Experience layer: app shell, chat canvas, billing, support, and admin evidence
+- Orchestration layer: intent routing, mode routing, and model/persona selection
+- Execution layer: OpenRouter, proxy fallback, race mode, and consortium synthesis
+- Trust layer: entitlements, release evidence, policy pages, and offline support
+
+See the live architecture view in the app at `/architecture/`.
+
+### Real Features Already Wired
+
+- ULTRAPLINIAN race mode with alternate-response navigation
+- CONSORTIUM synthesis mode for multi-model distillation
+- Proxy fallback runtime when a personal API key is missing
+- Service worker support with offline surface and app manifest
+- Billing, auth, support, and evidence pages already routed
+
 ## Product Modes
 
 - Chat
@@ -142,6 +160,14 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 - License: AGPL-3.0 (`LICENSE`)
 - Security policy: `SECURITY.md`
 - Credits and derivative note: `CREDITS.md`
+
+## Navigation
+
+- `/` workspace
+- `/architecture/` system map
+- `/billing/` plan and checkout flow
+- `/admin/evidence/` release evidence surface
+- `/support/` user support surface
 
 ## Release Checklist Before Push
 

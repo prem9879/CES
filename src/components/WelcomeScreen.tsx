@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useStore } from '@/store'
-import { Key, Terminal } from 'lucide-react'
+import { Key, Layers3, Terminal } from 'lucide-react'
 
 interface WelcomeScreenProps {
   onOpenSettings: () => void
@@ -81,6 +81,14 @@ export function WelcomeScreen({ onOpenSettings }: WelcomeScreenProps) {
         />
       </div>
 
+      <Link
+        href="/architecture/"
+        className="mb-8 flex items-center gap-2 rounded-full border border-theme-primary/60 bg-theme-dim/60 px-4 py-2 text-sm theme-primary transition-all hover:glow-box"
+      >
+        <Layers3 className="h-4 w-4" />
+        View CES architecture
+      </Link>
+
       {/* CTA */}
       <div className="flex flex-col items-center gap-4">
         {apiKey || proxyMode ? (
@@ -129,6 +137,7 @@ export function WelcomeScreen({ onOpenSettings }: WelcomeScreenProps) {
       </div>
 
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs opacity-80 flex gap-3 flex-wrap justify-center">
+        <Link href="/architecture/" className="underline">Architecture</Link>
         <Link href="/auth/" className="underline">Auth</Link>
         <Link href="/billing/" className="underline">Billing</Link>
         <Link href="/privacy-policy/" className="underline">Privacy</Link>

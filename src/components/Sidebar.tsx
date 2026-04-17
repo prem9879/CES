@@ -10,7 +10,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Terminal
+  Terminal,
 } from 'lucide-react'
 import { PersonaSelector } from './PersonaSelector'
 import { ModelSelector } from './ModelSelector'
@@ -171,6 +171,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 CES
               </p>
               <div className="mt-2 text-xs opacity-75 flex gap-2 justify-center flex-wrap">
+                <Link href="/architecture/" className="underline">Architecture</Link>
                 <Link href="/auth/" className="underline">Auth</Link>
                 <Link href="/billing/" className="underline">Billing</Link>
                 <Link href="/support/" className="underline">Support</Link>

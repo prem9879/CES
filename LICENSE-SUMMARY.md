@@ -30,5 +30,5 @@ The software is provided without warranty, as described in `LICENSE`.
 
 ## Attribution
 
-This repository includes substantial derivative and reworked AGPL-based components.
-See `NOTICE` for attribution details.
+This repository is a CES-first rework with one retained inspiration credit.
+See `NOTICE` for the concise attribution note.

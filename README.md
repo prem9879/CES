@@ -154,5 +154,5 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 
 ## Attribution
 
-This repository contains substantial rework of AGPL-licensed upstream foundations.
-All derivative work remains distributed under AGPL-3.0 requirements.
+CES is presented as the primary product and codebase in this repository.
+One concise inspiration credit is retained in `NOTICE`; all public-facing branding, UX, and release copy should remain CES-first.

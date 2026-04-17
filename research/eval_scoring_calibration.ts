@@ -9,6 +9,8 @@
  * - Discriminative power between quality tiers
  */
 
+// Refreshed during CES release cleanup.
+
 import { scoreResponse } from '../api/lib/ultraplinian'
 
 // ── Test Response Generator ──────────────────────────────────────────

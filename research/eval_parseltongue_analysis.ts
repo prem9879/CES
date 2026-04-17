@@ -10,6 +10,8 @@
  * - Reversibility / detectability metrics
  */
 
+// Refreshed during CES release cleanup.
+
 import {
   applyParseltongue,
   detectTriggers,

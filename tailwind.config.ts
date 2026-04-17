@@ -1,5 +1,6 @@
 import type { Config } from 'tailwindcss'
 
+// Refreshed during CES release cleanup.
 const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',

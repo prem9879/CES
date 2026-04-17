@@ -1,3 +1,4 @@
+# Refreshed during CES release cleanup.
 /api/*          /               404
 /src/* / 404
 /.env / 404

@@ -8,6 +8,8 @@
  * - Semantic preservation analysis
  */
 
+// Refreshed during CES release cleanup.
+
 import { hedgeReducer, directMode, casualMode, applySTMs, type STMModule } from '../src/stm/modules'
 
 // ── Test Infrastructure ──────────────────────────────────────────────

@@ -39,6 +39,9 @@ The GNU General Public License permits making a modified version and
 letting the public access it on a server without ever releasing its
 source code to the public.
 
+This repository keeps the AGPL-3.0 license as the legal source of truth.
+See NOTICE and CREDITS.md for project attribution context.
+
   The GNU Affero General Public License is designed specifically to
 ensure that, in such cases, the modified source code becomes available
 to the community.  It requires the operator of a network server to

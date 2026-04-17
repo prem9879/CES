@@ -51,8 +51,7 @@ export function ChatArea() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col px-2 py-2 md:px-4 md:py-4">
-      <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col overflow-hidden rounded-2xl border border-theme-primary/35 bg-theme-dim/45 shadow-2xl backdrop-blur-sm">
+    <div className="relative flex h-full min-h-0 flex-col border-l border-theme-primary/25 bg-theme-dim/35">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-theme-primary bg-theme-dim/60">
         <div className="flex items-center gap-3">
@@ -128,9 +127,9 @@ export function ChatArea() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-3 py-4 md:px-4 md:py-6 relative">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto relative">
         {currentConversation.messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center">
+          <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center px-4 text-center md:px-6">
             <div className="text-6xl mb-4">{persona.emoji}</div>
             <h3 className="text-xl font-semibold mb-2">
               Chat with {persona.name}
@@ -145,7 +144,7 @@ export function ChatArea() {
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto w-full space-y-4">
+          <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-5 md:px-6 md:py-6">
             {currentConversation.messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
@@ -168,7 +167,6 @@ export function ChatArea() {
 
       {/* Input */}
       <ChatInput />
-      </div>
     </div>
   )
 }

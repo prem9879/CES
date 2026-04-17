@@ -162,8 +162,8 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 - Credits and derivative note: `CREDITS.md`
 - Copyright and project notice: `NOTICE`
 
-Forks and redistributions must keep license and attribution notices required by AGPL-3.0.
-Code reuse is allowed under AGPL-3.0, but CES project identity and branding are reserved for the original CES project.
+Forks and redistributions must preserve AGPL-3.0 notices and provide corresponding source when required.
+The code is open under AGPL-3.0; CES project identity and branding remain reserved for the original CES distribution.
 
 ## Navigation
 

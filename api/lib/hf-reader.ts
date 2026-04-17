@@ -1,7 +1,7 @@
 /**
  * HuggingFace Dataset Reader
  *
- * Reads published batch files back from the pliny-the-prompter/g0dm0d3
+ * Reads published batch files back from the your-org/ces
  * HuggingFace Dataset repo. Complements hf-publisher.ts (write) with
  * read access for the Research API.
  *
@@ -22,7 +22,7 @@ const HF_API = 'https://huggingface.co/api'
 function getConfig() {
   return {
     token: process.env.HF_TOKEN || '',
-    repo: process.env.HF_DATASET_REPO || 'pliny-the-prompter/g0dm0d3',
+    repo: process.env.HF_DATASET_REPO || 'your-org/ces',
     branch: process.env.HF_DATASET_BRANCH || 'main',
   }
 }
@@ -57,7 +57,7 @@ export interface CorpusQuery {
   since?: number       // unix ms
   until?: number       // unix ms
   model?: string       // filter by model
-  mode?: 'standard' | 'ultraplinian'
+  mode?: 'standard' | 'ultraplinian' | 'consortium'
   limit?: number       // max records to return
   offset?: number
 }

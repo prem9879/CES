@@ -4,11 +4,11 @@ import { useEffect } from 'react'
 import { useStore } from '@/store'
 
 /**
- * Auto-detect a self-hosted G0DM0D3 API server at the same origin.
+ * Auto-detect a self-hosted CES API server at the same origin.
  *
  * When the frontend is served behind the docker-compose nginx proxy,
  * /v1/health is available on the same origin. If detected and auth
- * is open (no GODMODE_API_KEY configured), proxy mode activates
+ * is open (no CES_API_KEY configured), proxy mode activates
  * automatically — users can chat without entering any API keys.
  */
 export function useApiAutoDetect() {
@@ -35,33 +35,45 @@ export function useApiAutoDetect() {
 
     async function detect() {
       try {
-        // Step 1: Check if API is available at same origin
-        const healthRes = await fetch('/v1/health', { signal: controller.signal })
-        if (!healthRes.ok) return
-        const healthData = await healthRes.json()
-        if (healthData?.status !== 'ok') return
-
         const origin = window.location.origin
+        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
-        // Step 2: Check if auth is open (no GODMODE_API_KEY required)
+        const baseCandidates = isLocalhost
+          ? ['http://localhost:7860', origin]
+          : [origin]
+
+        let apiBase: string | null = null
+        for (const base of baseCandidates) {
+          const healthRes = await fetch(`${base}/v1/health`, { signal: controller.signal })
+          if (!healthRes.ok) continue
+          const healthData = await healthRes.json()
+          if (healthData?.status === 'ok') {
+            apiBase = base
+            break
+          }
+        }
+
+        if (!apiBase) return
+
+        // Step 2: Check if auth is open (no CES_API_KEY required)
         // Try accessing a gated endpoint with a dummy bearer token
-        const tierRes = await fetch('/v1/tier', {
+        const tierRes = await fetch(`${apiBase}/v1/tier`, {
           headers: { 'Authorization': 'Bearer self-hosted' },
           signal: controller.signal,
         })
 
         if (tierRes.ok || tierRes.status === 429) {
           // Auth is open or rate-limited (still means auth passed)
-          setUltraplinianApiUrl(origin)
+          setUltraplinianApiUrl(apiBase)
           if (!ultraplinianApiKey) {
             setUltraplinianApiKey('self-hosted')
           }
-          console.log('[G0DM0D3] Self-hosted API detected (open auth) at', origin)
+          console.log('[CES] Self-hosted API detected (open auth) at', apiBase)
         } else if (tierRes.status === 403 || tierRes.status === 401) {
           // Auth is enabled — user needs a real API key from the host
           // Still set the URL so they only need to enter the key in settings
-          setUltraplinianApiUrl(origin)
-          console.log('[G0DM0D3] Self-hosted API detected (auth required) at', origin)
+          setUltraplinianApiUrl(apiBase)
+          console.log('[CES] Self-hosted API detected (auth required) at', apiBase)
         }
       } catch {
         // No API at same origin — normal mode

@@ -3,6 +3,8 @@
  * Routes requests to multiple AI models via OpenRouter
  */
 
+import { getAccessToken } from '@/lib/session'
+
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 /**
@@ -91,6 +93,26 @@ interface OpenRouterResponse {
   }
 }
 
+interface OpenRouterErrorResponse {
+  error?: {
+    message?: string
+  } | string
+}
+
+function buildProxyHeaders(cesApiKey: string): HeadersInit {
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${cesApiKey}`,
+    'Content-Type': 'application/json',
+  }
+
+  const userAccessToken = getAccessToken()
+  if (userAccessToken) {
+    headers['X-User-Access-Token'] = userAccessToken
+  }
+
+  return headers
+}
+
 /**
  * Send a message to the AI model via OpenRouter
  */
@@ -101,7 +123,7 @@ export async function sendMessage({
   noLog = false,
   signal,
   temperature = 0.7,
-  maxTokens = 4096,
+  maxTokens = 512,
   top_p,
   top_k,
   frequency_penalty,
@@ -112,58 +134,65 @@ export async function sendMessage({
     throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }
 
-  // Prepare request body
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    temperature,
-    max_tokens: maxTokens
+  // Validate API key before making request
+  if (!apiKey || apiKey.trim() === '') {
+    throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }
 
-  // Add optional sampling parameters (only if explicitly set)
-  if (top_p !== undefined) body.top_p = top_p
-  if (top_k !== undefined) body.top_k = top_k
-  if (frequency_penalty !== undefined) body.frequency_penalty = frequency_penalty
-  if (presence_penalty !== undefined) body.presence_penalty = presence_penalty
-  if (repetition_penalty !== undefined) body.repetition_penalty = repetition_penalty
+  const attempt = async (tokenBudget: number): Promise<string> => {
+    const body: Record<string, unknown> = {
+      model,
+      messages,
+      temperature,
+      max_tokens: tokenBudget
+    }
 
-  // Add provider-specific options if needed
-  const providerOptions: Record<string, unknown> = {}
+    if (top_p !== undefined) body.top_p = top_p
+    if (top_k !== undefined) body.top_k = top_k
+    if (frequency_penalty !== undefined) body.frequency_penalty = frequency_penalty
+    if (presence_penalty !== undefined) body.presence_penalty = presence_penalty
+    if (repetition_penalty !== undefined) body.repetition_penalty = repetition_penalty
 
-  // Handle no-log mode for supported providers
-  if (noLog) {
-    // OpenRouter passes through provider preferences
-    providerOptions['allow_fallbacks'] = false
+    const providerOptions: Record<string, unknown> = {}
+    if (noLog) {
+      providerOptions['allow_fallbacks'] = false
+    }
+    if (Object.keys(providerOptions).length > 0) {
+      body.provider = providerOptions
+    }
+
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://ces.local',
+        'X-Title': 'Cognitive-Execution-System'
+      },
+      body: JSON.stringify(body),
+      signal
+    })
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({}))) as OpenRouterErrorResponse
+      const message = String(typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || '')
+      const isBudgetError = /more credits|afford|max_tokens|token|budget|quota|insufficient/i.test(message)
+      if (isBudgetError && tokenBudget > 256) {
+        return attempt(Math.max(256, Math.floor(tokenBudget / 2)))
+      }
+      throw new Error(formatAPIError(response.status, message))
+    }
+
+    const data: OpenRouterResponse = await response.json()
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error('No response from model')
+    }
+
+    return data.choices[0].message.content
   }
 
-  if (Object.keys(providerOptions).length > 0) {
-    body.provider = providerOptions
-  }
-
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
-    },
-    body: JSON.stringify(body),
-    signal
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    throw new Error(formatAPIError(response.status, errorData.error?.message))
-  }
-
-  const data: OpenRouterResponse = await response.json()
-
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error('No response from model')
-  }
-
-  return data.choices[0].message.content
+  return attempt(maxTokens)
 }
 
 /**
@@ -177,14 +206,14 @@ export async function* streamMessage({
   noLog = false,
   signal,
   temperature = 0.7,
-  maxTokens = 4096,
+  maxTokens = 512,
   top_p,
   top_k,
   frequency_penalty,
   presence_penalty,
   repetition_penalty
 }: SendMessageOptions): AsyncGenerator<string, void, unknown> {
-  if (!apiKey) {
+  if (!apiKey || apiKey.trim() === '') {
     throw new Error('No API key set. Go to Settings → API Key and enter your OpenRouter key from [openrouter.ai/keys](https://openrouter.ai/keys).')
   }
 
@@ -201,14 +230,17 @@ export async function* streamMessage({
   if (frequency_penalty !== undefined) streamBody.frequency_penalty = frequency_penalty
   if (presence_penalty !== undefined) streamBody.presence_penalty = presence_penalty
   if (repetition_penalty !== undefined) streamBody.repetition_penalty = repetition_penalty
+  if (noLog) {
+    streamBody.provider = { allow_fallbacks: false }
+  }
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
+      'HTTP-Referer': 'https://ces.local',
+      'X-Title': 'Cognitive-Execution-System'
     },
     body: JSON.stringify(streamBody),
     signal
@@ -264,8 +296,8 @@ export async function getModels(apiKey: string): Promise<string[]> {
   const response = await fetch('https://openrouter.ai/api/v1/models', {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
+      'HTTP-Referer': 'https://ces.local',
+      'X-Title': 'Cognitive-Execution-System'
     }
   })
 
@@ -289,13 +321,96 @@ export async function validateApiKey(apiKey: string): Promise<boolean> {
   }
 }
 
+export interface ApiKeyHealth {
+  ok: boolean
+  status: 'valid' | 'invalid' | 'billing' | 'rate_limited' | 'network_error' | 'unknown'
+  message: string
+}
+
+/**
+ * Validate key health with actionable status for settings UX.
+ */
+export async function checkApiKeyHealth(apiKey: string): Promise<ApiKeyHealth> {
+  const trimmed = apiKey.trim()
+  if (!trimmed) {
+    return {
+      ok: false,
+      status: 'invalid',
+      message: 'No API key provided. Add your OpenRouter key first.',
+    }
+  }
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${trimmed}`,
+        'HTTP-Referer': 'https://ces.local',
+        'X-Title': 'Cognitive-Execution-System',
+      }
+    })
+
+    if (response.ok) {
+      return {
+        ok: true,
+        status: 'valid',
+        message: 'Key is valid and OpenRouter is reachable.',
+      }
+    }
+
+    const errorData = (await response.json().catch(() => ({}))) as OpenRouterErrorResponse
+    const rawMessage = String(typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || '').toLowerCase()
+
+    if (response.status === 401 || rawMessage.includes('invalid') || rawMessage.includes('unauthorized')) {
+      return {
+        ok: false,
+        status: 'invalid',
+        message: 'Invalid or expired API key. Generate a fresh key at openrouter.ai/keys.',
+      }
+    }
+
+    if (
+      response.status === 403 ||
+      rawMessage.includes('credit') ||
+      rawMessage.includes('balance') ||
+      rawMessage.includes('insufficient') ||
+      rawMessage.includes('billing')
+    ) {
+      return {
+        ok: false,
+        status: 'billing',
+        message: 'Key accepted but credits/permissions are insufficient. Check billing at openrouter.ai/credits.',
+      }
+    }
+
+    if (response.status === 429 || rawMessage.includes('rate limit')) {
+      return {
+        ok: false,
+        status: 'rate_limited',
+        message: 'Rate limited by OpenRouter. Wait briefly and retry.',
+      }
+    }
+
+    return {
+      ok: false,
+      status: 'unknown',
+      message: `Health check failed (${response.status}).`,
+    }
+  } catch {
+    return {
+      ok: false,
+      status: 'network_error',
+      message: 'Network error while checking key health. Verify connection and try again.',
+    }
+  }
+}
+
 // ── Proxy Mode: Route standard chat through self-hosted API ───────────
 
 interface ProxyMessageOptions {
   messages: Message[]
   model: string
   apiBaseUrl: string
-  godmodeApiKey: string
+  cesApiKey: string
   signal?: AbortSignal
   temperature?: number
   maxTokens?: number
@@ -304,12 +419,12 @@ interface ProxyMessageOptions {
   frequency_penalty?: number
   presence_penalty?: number
   repetition_penalty?: number
-  godmode?: boolean
+  ces?: boolean
   stm_modules?: string[]
 }
 
 /**
- * Send a message via the self-hosted G0DM0D3 API server.
+ * Send a message via the self-hosted CES API server.
  * Used in proxy mode when no personal OpenRouter key is available —
  * the server uses its own server-side key.
  */
@@ -317,56 +432,66 @@ export async function sendMessageViaProxy({
   messages,
   model,
   apiBaseUrl,
-  godmodeApiKey,
+  cesApiKey,
   signal,
   temperature,
-  maxTokens = 4096,
+  maxTokens = 512,
   top_p,
   top_k,
   frequency_penalty,
   presence_penalty,
   repetition_penalty,
-  godmode = true,
+  ces = true,
   stm_modules = ['hedge_reducer', 'direct_mode'],
 }: ProxyMessageOptions): Promise<string> {
-  const body: Record<string, unknown> = {
-    messages,
-    model,
-    max_tokens: maxTokens,
-    godmode,
-    stm_modules,
+  // Validate API key
+  if (!cesApiKey || cesApiKey.trim() === '') {
+    throw new Error('No API key available for proxy mode. Check your configuration.')
   }
 
-  if (temperature !== undefined) body.temperature = temperature
-  if (top_p !== undefined) body.top_p = top_p
-  if (top_k !== undefined) body.top_k = top_k
-  if (frequency_penalty !== undefined) body.frequency_penalty = frequency_penalty
-  if (presence_penalty !== undefined) body.presence_penalty = presence_penalty
-  if (repetition_penalty !== undefined) body.repetition_penalty = repetition_penalty
+  const attempt = async (tokenBudget: number): Promise<string> => {
+    const body: Record<string, unknown> = {
+      messages,
+      model,
+      max_tokens: tokenBudget,
+      ces,
+      stm_modules,
+    }
 
-  const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${godmodeApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-    signal,
-  })
+    if (temperature !== undefined) body.temperature = temperature
+    if (top_p !== undefined) body.top_p = top_p
+    if (top_k !== undefined) body.top_k = top_k
+    if (frequency_penalty !== undefined) body.frequency_penalty = frequency_penalty
+    if (presence_penalty !== undefined) body.presence_penalty = presence_penalty
+    if (repetition_penalty !== undefined) body.repetition_penalty = repetition_penalty
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}))
-    const errorMessage = (errorData as any).error?.message || (errorData as any).error || `API error: ${response.status}`
-    throw new Error(errorMessage)
+    const response = await fetch(`${apiBaseUrl}/v1/chat/completions`, {
+      method: 'POST',
+      headers: buildProxyHeaders(cesApiKey),
+      body: JSON.stringify(body),
+      signal,
+    })
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({}))) as OpenRouterErrorResponse
+      const errorMessage = String(typeof errorData.error === 'string' ? errorData.error : errorData.error?.message || `API error: ${response.status}`)
+      const isBudgetError = /more credits|afford|max_tokens|token|budget|quota|insufficient/i.test(errorMessage)
+      if (isBudgetError && tokenBudget > 256) {
+        return attempt(Math.max(256, Math.floor(tokenBudget / 2)))
+      }
+      throw new Error(errorMessage)
+    }
+
+    const data = await response.json()
+
+    if (!data.choices || data.choices.length === 0) {
+      throw new Error('No response from model')
+    }
+
+    return data.choices[0].message.content
   }
 
-  const data = await response.json()
-
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error('No response from model')
-  }
-
-  return data.choices[0].message.content
+  return attempt(maxTokens)
 }
 
 // ── CONSORTIUM Streaming (Hive-Mind Synthesis) ────────────────────────
@@ -398,7 +523,7 @@ export interface ConsortiumComplete {
   }
   params_used: Record<string, number | undefined>
   pipeline: {
-    godmode: boolean
+    ces: boolean
     autotune: { detected_context: string; confidence: number; reasoning: string; strategy: string } | null
     parseltongue: { triggers_found: string[]; technique_used: string; transformations_count: number } | null
     stm: { modules_applied: string[]; original_length: number; transformed_length: number } | null
@@ -419,10 +544,10 @@ export interface ConsortiumOptions {
   messages: Message[]
   openrouterApiKey: string
   apiBaseUrl: string
-  godmodeApiKey: string
+  cesApiKey: string
   tier?: 'fast' | 'standard' | 'smart' | 'power' | 'ultra'
   orchestrator_model?: string
-  godmode?: boolean
+  ces?: boolean
   autotune?: boolean
   strategy?: string
   parseltongue?: boolean
@@ -448,8 +573,8 @@ export async function streamConsortium(
   callbacks: ConsortiumCallbacks,
 ): Promise<void> {
   const {
-    messages, openrouterApiKey, apiBaseUrl, godmodeApiKey,
-    tier = 'fast', orchestrator_model, godmode = true,
+    messages, openrouterApiKey, apiBaseUrl, cesApiKey,
+    tier = 'fast', orchestrator_model, ces = true,
     autotune = true, strategy = 'adaptive',
     parseltongue = true, parseltongue_technique = 'leetspeak',
     parseltongue_intensity = 'medium', stm_modules = ['hedge_reducer', 'direct_mode'],
@@ -459,13 +584,10 @@ export async function streamConsortium(
 
   const response = await fetch(`${apiBaseUrl}/v1/consortium/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${godmodeApiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildProxyHeaders(cesApiKey),
     body: JSON.stringify({
       messages, openrouter_api_key: openrouterApiKey, tier, orchestrator_model,
-      godmode, autotune, strategy, parseltongue, parseltongue_technique,
+      ces, autotune, strategy, parseltongue, parseltongue_technique,
       parseltongue_intensity, stm_modules, stream: true, liquid, liquid_min_delta,
     }),
     signal,
@@ -565,7 +687,7 @@ export interface UltraplinianComplete {
   }
   params_used: Record<string, number | undefined>
   pipeline: {
-    godmode: boolean
+    ces: boolean
     autotune: { detected_context: string; confidence: number; reasoning: string; strategy: string } | null
     parseltongue: { triggers_found: string[]; technique_used: string; transformations_count: number } | null
     stm: { modules_applied: string[]; original_length: number; transformed_length: number } | null
@@ -584,9 +706,9 @@ export interface UltraplinianOptions {
   messages: Message[]
   openrouterApiKey: string
   apiBaseUrl: string
-  godmodeApiKey: string
+  cesApiKey: string
   tier?: 'fast' | 'standard' | 'smart' | 'power' | 'ultra'
-  godmode?: boolean
+  ces?: boolean
   autotune?: boolean
   strategy?: string
   parseltongue?: boolean
@@ -612,8 +734,8 @@ export async function streamUltraplinian(
   callbacks: UltraplinianCallbacks,
 ): Promise<void> {
   const {
-    messages, openrouterApiKey, apiBaseUrl, godmodeApiKey,
-    tier = 'fast', godmode = true, autotune = true, strategy = 'adaptive',
+    messages, openrouterApiKey, apiBaseUrl, cesApiKey,
+    tier = 'fast', ces = true, autotune = true, strategy = 'adaptive',
     parseltongue = true, parseltongue_technique = 'leetspeak',
     parseltongue_intensity = 'medium', stm_modules = ['hedge_reducer', 'direct_mode'],
     liquid = true, liquid_min_delta = 8,
@@ -622,12 +744,9 @@ export async function streamUltraplinian(
 
   const response = await fetch(`${apiBaseUrl}/v1/ultraplinian/completions`, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${godmodeApiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: buildProxyHeaders(cesApiKey),
     body: JSON.stringify({
-      messages, openrouter_api_key: openrouterApiKey, tier, godmode,
+      messages, openrouter_api_key: openrouterApiKey, tier, ces,
       autotune, strategy, parseltongue, parseltongue_technique,
       parseltongue_intensity, stm_modules, stream: liquid, liquid_min_delta,
     }),

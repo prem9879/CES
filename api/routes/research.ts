@@ -1,7 +1,7 @@
 /**
  * Research API Routes
  *
- * Read-access endpoints for the pliny-the-prompter/g0dm0d3 HuggingFace
+ * Read-access endpoints for the your-org/ces HuggingFace
  * dataset. Lets researchers query, filter, and download the full
  * published corpus — not just the current in-memory buffer.
  *
@@ -37,9 +37,9 @@ let lastFlushTime = 0
 
 researchRoutes.get('/info', (_req, res) => {
   res.json({
-    name: 'G0DM0D3 Research Dataset',
-    repo: 'pliny-the-prompter/g0dm0d3',
-    repo_url: 'https://huggingface.co/datasets/pliny-the-prompter/g0dm0d3',
+    name: 'CES Research Dataset',
+    repo: 'your-org/ces',
+    repo_url: 'https://huggingface.co/datasets/your-org/ces',
     license: 'AGPL-3.0',
     description: 'Open research dataset for LLM robustness and safety evaluation. Contains opt-in interaction data with full pipeline metadata from ULTRAPLINIAN multi-model racing, AutoTune context-adaptive parameter tuning, Parseltongue obfuscation, and STM output normalization.',
     hf_reader_enabled: isReaderEnabled(),
@@ -66,7 +66,7 @@ researchRoutes.get('/info', (_req, res) => {
         mode: '"standard" | "ultraplinian"',
         tier: 'string | null',
         stream: 'boolean',
-        pipeline: '{ godmode, autotune, parseltongue, stm_modules, strategy }',
+        pipeline: '{ ces, autotune, parseltongue, stm_modules, strategy }',
         autotune: '{ detected_context, confidence } | null',
         model_results: 'Array<{ model, score, duration_ms, success, content_length, error_type }> | null',
         winner: '{ model, score, duration_ms, content_length } | null',
@@ -156,7 +156,7 @@ researchRoutes.get('/batches', async (req, res) => {
 // ── Batch: read a single file ────────────────────────────────────────
 // Path comes as wildcard: /v1/research/batch/metadata/batch_2024-01-01_0001.jsonl
 
-researchRoutes.get('/batch/*', async (req, res) => {
+researchRoutes.get(/^\/batch\/(.+)$/, async (req, res) => {
   try {
     const filePath = req.params[0]
     if (!filePath || !filePath.endsWith('.jsonl')) {
@@ -190,7 +190,7 @@ researchRoutes.get('/query', tierGate('research:full'), async (req, res) => {
       since: req.query.since ? parseInt(String(req.query.since)) : undefined,
       until: req.query.until ? parseInt(String(req.query.until)) : undefined,
       model: req.query.model as string | undefined,
-      mode: req.query.mode as 'standard' | 'ultraplinian' | undefined,
+      mode: req.query.mode as 'standard' | 'ultraplinian' | 'consortium' | undefined,
       limit: Math.min(parseInt(String(req.query.limit)) || 100, 1000),
       offset: parseInt(String(req.query.offset)) || 0,
     }
@@ -243,7 +243,7 @@ researchRoutes.get('/download', tierGate('corpus:download'), async (req, res) =>
     const includeMemory = req.query.include_memory !== 'false' // default: true
 
     res.setHeader('Content-Type', 'application/x-ndjson')
-    res.setHeader('Content-Disposition', `attachment; filename="g0dm0d3-corpus-${Date.now()}.jsonl"`)
+    res.setHeader('Content-Disposition', `attachment; filename="ces-corpus-${Date.now()}.jsonl"`)
 
     // First: stream published batches from HF
     const batches = await listBatchFiles()

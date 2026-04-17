@@ -1,19 +1,25 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { Message, useStore } from '@/store'
-import { Copy, Check, User, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Copy, Check, User, ThumbsUp, ThumbsDown, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ImageIcon, FileAudio, FileText, Link2, ExternalLink } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { getContextLabel, PARAM_META } from '@/lib/autotune'
+import { formatBytes } from '@/lib/multimodal'
 
 interface ChatMessageProps {
   message: Message
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
-  const { personas, currentConversation, rateMessage, autoTuneEnabled, showMagic } = useStore()
+  // Use proper selector for currentConversation to ensure React re-renders on changes
+  const currentConversation = useStore(state =>
+    state.conversations.find(c => c.id === state.currentConversationId) || null
+  )
+  const { personas, rateMessage, autoTuneEnabled, showMagic } = useStore()
   const [copied, setCopied] = useState(false)
   const [showTuneDetails, setShowTuneDetails] = useState(false)
   const [isLiquidMorphing, setIsLiquidMorphing] = useState(false)
@@ -137,11 +143,84 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         </div>
 
+        {message.citations?.length ? (
+          <div className="mb-3 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-2 text-xs">
+            <div className="mb-2 flex items-center gap-1 font-semibold text-cyan-300">
+              <Link2 className="h-3.5 w-3.5" />
+              <span>Trusted sources</span>
+            </div>
+            <div className="space-y-2">
+              {message.citations.map((citation, index) => (
+                <div key={`${citation.url}-${index}`} className="rounded border border-cyan-500/15 bg-black/20 p-2">
+                  <a href={citation.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-cyan-200 hover:underline">
+                    <span>{index + 1}. {citation.title}</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                  <div className="mt-1 text-[10px] uppercase tracking-wide text-cyan-400/80">
+                    {citation.domain} · {citation.kind}
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap text-theme-secondary">{citation.snippet}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {message.attachments?.length ? (
+          <div className="mb-3 space-y-2 rounded-md border border-theme-primary/20 bg-theme-bg/50 p-2 text-xs">
+            {message.attachments.map((attachment) => (
+              <div key={attachment.id} className="rounded border border-theme-primary/20 p-2">
+                <div className="mb-1 flex items-center gap-1">
+                  {attachment.type === 'image' && <ImageIcon className="h-3.5 w-3.5 text-cyan-400" />}
+                  {attachment.type === 'audio' && <FileAudio className="h-3.5 w-3.5 text-orange-400" />}
+                  {attachment.type === 'pdf' && <FileText className="h-3.5 w-3.5 text-purple-400" />}
+                  <span className="font-medium">{attachment.name}</span>
+                  <span className="theme-secondary">({formatBytes(attachment.sizeBytes)})</span>
+                </div>
+
+                {attachment.type === 'image' && attachment.previewUrl && (
+                  <div className="space-y-1">
+                    <Image
+                      src={attachment.previewUrl}
+                      alt={attachment.name}
+                      width={attachment.width || 640}
+                      height={attachment.height || 360}
+                      unoptimized
+                      className="max-h-64 rounded border border-theme-primary/20 object-contain"
+                    />
+                    {attachment.ocrText && (
+                      <p className="theme-secondary whitespace-pre-wrap"><strong>OCR:</strong> {attachment.ocrText}</p>
+                    )}
+                    {attachment.visionSummary && (
+                      <p className="theme-secondary whitespace-pre-wrap"><strong>Vision:</strong> {attachment.visionSummary}</p>
+                    )}
+                  </div>
+                )}
+
+                {attachment.type === 'audio' && attachment.previewUrl && (
+                  <div className="space-y-1">
+                    <audio controls className="w-full" src={attachment.previewUrl} preload="metadata" />
+                    {attachment.transcription && (
+                      <p className="theme-secondary whitespace-pre-wrap">
+                        <strong>Transcript{attachment.transcriptionQuality ? ` (${attachment.transcriptionQuality})` : ''}:</strong> {attachment.transcription}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {attachment.type === 'pdf' && attachment.extractedText && (
+                  <p className="theme-secondary whitespace-pre-wrap">{attachment.extractedText}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {/* Content */}
         <div className={`prose prose-invert max-w-none text-sm ${isLiquidMorphing ? 'liquid-morph' : ''}`}>
           <ReactMarkdown
             components={{
-              code({ node, className, children, ...props }) {
+              code({ className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || '')
                 const inline = !match
 

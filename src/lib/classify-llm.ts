@@ -155,8 +155,8 @@ export async function classifyWithLLM(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://godmod3.ai',
-        'X-Title': 'G0DM0D3-Classifier',
+        'HTTP-Referer': 'https://ces.local',
+        'X-Title': 'CES-Classifier',
       },
       body: JSON.stringify({
         model: CLASSIFIER_MODEL,
@@ -197,11 +197,12 @@ export async function classifyWithLLM(
     }
 
     return parsed
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'AbortError') {
       console.warn('[Classify] LLM classification timed out, using regex fallback')
     } else {
-      console.warn('[Classify] LLM classification error, using regex fallback:', err.message)
+      const message = err instanceof Error ? err.message : 'unknown error'
+      console.warn('[Classify] LLM classification error, using regex fallback:', message)
     }
     return regexResult
   }

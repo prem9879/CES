@@ -3,7 +3,7 @@
  *
  * POST /v1/ultraplinian/completions
  *
- * Queries N models in parallel with the GODMODE system prompt + Depth Directive,
+ * Queries N models in parallel with the CES system prompt + Depth Directive,
  * scores all responses on substance/directness/completeness, and returns the winner
  * alongside full race metadata.
  *
@@ -15,9 +15,9 @@
  * - Final polished result sent as race:complete
  *
  * Full pipeline per model:
- * 1. GODMODE system prompt + Depth Directive injected
+ * 1. CES system prompt + Depth Directive injected
  * 2. AutoTune computes context-adaptive parameters
- * 3. GODMODE parameter boost applied (+temp, +presence, +freq)
+ * 3. CES parameter boost applied (+temp, +presence, +freq)
  * 4. Parseltongue obfuscates trigger words (if enabled)
  * 5. All models queried in parallel via OpenRouter
  * 6. Responses scored and ranked (threshold-gated leader upgrades)
@@ -31,17 +31,18 @@ import { applyParseltongue, type ParseltongueConfig } from '../../src/lib/parsel
 import { allModules, applySTMs, type STMModule } from '../../src/stm/modules'
 import { getSharedProfiles } from './autotune'
 import {
-  GODMODE_SYSTEM_PROMPT,
+  CES_SYSTEM_PROMPT,
   DEPTH_DIRECTIVE,
   getModelsForTier,
   raceModels,
   scoreResponse,
-  applyGodmodeBoost,
+  applyCESBoost,
   type SpeedTier,
   type ModelResult,
 } from '../lib/ultraplinian'
 import { addEntry } from '../lib/dataset'
 import { recordEvent, categorizeError } from '../lib/metadata'
+import { isRaceTierAllowedForPlan, resolveOptionalAuthenticatedEntitlements } from '../lib/user-entitlements'
 
 export const ultraplinianRoutes = Router()
 
@@ -54,7 +55,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
       openrouter_api_key: caller_key,
       // ULTRAPLINIAN options
       tier = 'fast' as SpeedTier,
-      godmode = true,
+      ces = true,
       custom_system_prompt,
       // AutoTune options
       autotune = true,
@@ -87,10 +88,23 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     }
 
     // Resolve OpenRouter key: caller-provided > server-side env var
-    const openrouter_api_key = caller_key || process.env.OPENROUTER_API_KEY || ''
+    let openrouter_api_key = caller_key || process.env.OPENROUTER_API_KEY || ''
+    
+    // Check for Authorization header as fallback (for local dev mode or Bearer tokens)
+    if (!openrouter_api_key) {
+      const authHeader = req.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const bearerToken = authHeader.slice(7).trim()
+        // Allow local-dev-mode or any Bearer token in dev environment
+        if (bearerToken === 'local-dev-mode' || process.env.NODE_ENV !== 'production') {
+          openrouter_api_key = bearerToken
+        }
+      }
+    }
+    
     if (!openrouter_api_key) {
       res.status(400).json({
-        error: 'No OpenRouter API key available. Either pass openrouter_api_key in the request body, or set OPENROUTER_API_KEY on the server. Get a key at https://openrouter.ai/keys',
+        error: 'No OpenRouter API key available. Either pass openrouter_api_key in the request body, set Authorization header with Bearer token, or set OPENROUTER_API_KEY on the server. Get a key at https://openrouter.ai/keys',
       })
       return
     }
@@ -99,6 +113,26 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     if (!validTiers.includes(tier)) {
       res.status(400).json({
         error: `Invalid tier. Must be one of: ${validTiers.join(', ')}`,
+      })
+      return
+    }
+
+    // Optional dual-path enforcement for authenticated app users.
+    try {
+      const userEntitlements = resolveOptionalAuthenticatedEntitlements(req)
+      if (userEntitlements && !isRaceTierAllowedForPlan(tier, userEntitlements.plan)) {
+        res.status(403).json({
+          error: 'Upgrade required',
+          message: `Your ${userEntitlements.plan.toUpperCase()} plan allows ULTRAPLINIAN up to ${userEntitlements.maxRaceTier.toUpperCase()}.`,
+          plan: userEntitlements.plan,
+          allowed_tier: userEntitlements.maxRaceTier,
+          requested_tier: tier,
+        })
+        return
+      }
+    } catch (error) {
+      res.status(401).json({
+        error: error instanceof Error ? error.message : 'Invalid user access token.',
       })
       return
     }
@@ -113,7 +147,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
         current_tier: currentTier,
         allowed_tiers: tierConfig.ultraplinianTiers,
         requested_tier: tier,
-        upgrade: 'Contact sales or set GODMODE_TIER_KEYS to upgrade your API key tier.',
+        upgrade: 'Contact sales or set CES_TIER_KEYS to upgrade your API key tier.',
       })
       return
     }
@@ -121,7 +155,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     // Clamp liquid_min_delta to valid range
     const minDelta = Math.max(1, Math.min(50, Number(liquid_min_delta) || 8))
 
-    // ── Build messages with GODMODE prompt ────────────────────────────
+    // ── Build messages with CES prompt ────────────────────────────
     const normalizedMessages = messages.map((m: any) => ({
       role: m.role as 'system' | 'user' | 'assistant',
       content: String(m.content || ''),
@@ -131,9 +165,9 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     const lastUserMsg = [...normalizedMessages].reverse().find(m => m.role === 'user')
     const userContent = lastUserMsg?.content || ''
 
-    // Build the system prompt: GODMODE + Depth Directive (or custom)
-    const systemPrompt = godmode
-      ? (custom_system_prompt || GODMODE_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
+    // Build the system prompt: CES + Depth Directive (or custom)
+    const systemPrompt = ces
+      ? (custom_system_prompt || CES_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
       : custom_system_prompt || ''
 
     // Build final message array for each model
@@ -183,13 +217,13 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
       }
     }
 
-    // Apply GODMODE boost
-    if (godmode) {
-      finalParams = applyGodmodeBoost(finalParams)
+    // Apply CES boost
+    if (ces) {
+      finalParams = applyCESBoost(finalParams)
     }
 
     // ── Parseltongue ─────────────────────────────────────────────────
-    let parseltongueResult = null
+    let parseltongueResult: any = null
     let processedMessages = baseMessages
 
     if (parseltongue) {
@@ -251,7 +285,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
         liquid_min_delta: minDelta,
         params_used: finalParams,
         pipeline: {
-          godmode,
+          ces,
           autotune: autotuneResult
             ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, strategy }
             : null,
@@ -373,7 +407,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
           model: winner.model, mode: 'ultraplinian',
           messages: normalizedMessages.filter(m => m.role !== 'system'),
           response: finalResponse,
-          autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params, reasoning: autotuneResult.reasoning } : undefined,
+          autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params as unknown as Record<string, number>, reasoning: autotuneResult.reasoning } : undefined,
           parseltongue: parseltongueResult || undefined,
           stm: stmResult ? { modules_applied: stmResult.modules_applied } : undefined,
           ultraplinian: { tier, models_queried: models, winner_model: winner.model, all_scores: scoredResults.map(r => ({ model: r.model, score: r.score, duration_ms: r.duration_ms, success: r.success })), total_duration_ms: totalDuration },
@@ -413,7 +447,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
         },
         params_used: finalParams,
         pipeline: {
-          godmode,
+          ces,
           autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
           parseltongue: parseltongueResult,
           stm: stmResult,
@@ -428,7 +462,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
         tier,
         stream: true,
         pipeline: {
-          godmode,
+          ces,
           autotune: !!autotuneResult,
           parseltongue: !!parseltongueResult,
           stm_modules: stm_modules || [],
@@ -501,9 +535,16 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     if (!winner || !winner.content) {
       recordEvent({
         endpoint: '/v1/ultraplinian/completions',
-        mode: 'ultraplinian-failed',
+        mode: 'ultraplinian',
         tier,
         stream,
+        pipeline: {
+          ces,
+          autotune,
+          parseltongue,
+          stm_modules,
+          strategy,
+        },
         models_queried: models.length,
         models_succeeded: scoredResults.filter(r => r.success).length,
         model_results: scoredResults.map(r => ({
@@ -512,6 +553,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
           error_type: r.error ? categorizeError(r.error) : undefined,
         })),
         total_duration_ms: Date.now() - startTime,
+        response_length: 0,
       })
       res.status(502).json({
         error: 'All models failed in ULTRAPLINIAN mode',
@@ -551,7 +593,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
         model: winner.model, mode: 'ultraplinian',
         messages: normalizedMessages.filter(m => m.role !== 'system'),
         response: finalResponse,
-        autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params, reasoning: autotuneResult.reasoning } : undefined,
+        autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params as unknown as Record<string, number>, reasoning: autotuneResult.reasoning } : undefined,
         parseltongue: parseltongueResult || undefined,
         stm: stmResult ? { modules_applied: stmResult.modules_applied } : undefined,
         ultraplinian: { tier, models_queried: models, winner_model: winner.model, all_scores: scoredResults.map(r => ({ model: r.model, score: r.score, duration_ms: r.duration_ms, success: r.success })), total_duration_ms: totalDuration },
@@ -565,7 +607,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
       tier,
       stream: false,
       pipeline: {
-        godmode,
+        ces,
         autotune: !!autotuneResult,
         parseltongue: !!parseltongueResult,
         stm_modules: stm_modules || [],
@@ -619,7 +661,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
       },
       params_used: finalParams,
       pipeline: {
-        godmode,
+        ces,
         autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
         parseltongue: parseltongueResult,
         stm: stmResult,
@@ -630,11 +672,18 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     console.error('[ultraplinian]', err)
     recordEvent({
       endpoint: '/v1/ultraplinian/completions',
-      mode: 'ultraplinian-error',
-      error_type: 'internal_error',
+      mode: 'ultraplinian',
+      stream: Boolean(req?.body?.stream ?? true),
+      pipeline: {
+        ces: true,
+        autotune: true,
+        parseltongue: true,
+        stm_modules: [],
+      },
       total_duration_ms: Date.now() - startTime,
+      response_length: 0,
     })
-    if (stream) {
+    if (Boolean(req?.body?.stream ?? true)) {
       try {
         res.write(`event: race:error\ndata: ${JSON.stringify({ error: 'Internal server error' })}\n\n`)
         res.end()

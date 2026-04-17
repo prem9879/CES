@@ -6,7 +6,7 @@
  * Drop-in replacement for the OpenAI API. Works with any OpenAI-compatible SDK:
  *
  *   from openai import OpenAI
- *   client = OpenAI(base_url="https://your-g0dm0d3.hf.space/v1", api_key="g0d_xxx")
+ *   client = OpenAI(base_url="https://your-novaos.hf.space/v1", api_key="ces_xxx")
  *   r = client.chat.completions.create(model="ultraplinian", messages=[...])
  *   print(r.choices[0].message.content)
  *
@@ -15,10 +15,10 @@
  *   "ultraplinian-fast"      → Same as above
  *   "ultraplinian-standard"  → ULTRAPLINIAN race (standard tier, 20 models)
  *   "ultraplinian-full"      → ULTRAPLINIAN race (full tier, 27 models)
- *   Any OpenRouter model ID  → Single-model with full GODMODE pipeline
+ *   Any OpenRouter model ID  → Single-model with full CES pipeline
  *
- * G0DM0D3-specific options (pass via extra_body in the OpenAI Python SDK):
- *   godmode, autotune, strategy, parseltongue, stm_modules, previous_winner, etc.
+ * NOVAOS-specific options (pass via extra_body in the OpenAI Python SDK):
+ *   ces, autotune, strategy, parseltongue, stm_modules, previous_winner, etc.
  *
  * Streaming:
  *   stream=false → Standard OpenAI JSON response (default)
@@ -33,12 +33,12 @@ import { allModules, applySTMs, type STMModule } from '../../src/stm/modules'
 import { sendMessage } from '../../src/lib/openrouter'
 import { getSharedProfiles } from './autotune'
 import {
-  GODMODE_SYSTEM_PROMPT,
+  CES_SYSTEM_PROMPT,
   DEPTH_DIRECTIVE,
   getModelsForTier,
   raceModels,
   scoreResponse,
-  applyGodmodeBoost,
+  applyCESBoost,
   type SpeedTier,
   type ModelResult,
 } from '../lib/ultraplinian'
@@ -50,7 +50,7 @@ export const completionsRoutes = Router()
 // ── Helpers ────────────────────────────────────────────────────────────
 
 function genId(): string {
-  return `godmode-${randomUUID().slice(0, 12)}`
+  return `ces-${randomUUID().slice(0, 12)}`
 }
 
 function now(): number {
@@ -62,14 +62,14 @@ function makeChatCompletion(
   id: string,
   model: string,
   content: string,
-  godmodeMetadata?: Record<string, unknown>,
+  cesMetadata?: Record<string, unknown>,
 ) {
   return {
     id,
     object: 'chat.completion' as const,
     created: now(),
     model,
-    system_fingerprint: 'godmode-v0.3',
+    system_fingerprint: 'ces-v0.3',
     choices: [
       {
         index: 0,
@@ -78,7 +78,7 @@ function makeChatCompletion(
       },
     ],
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-    ...(godmodeMetadata && { godmode: godmodeMetadata }),
+    ...(cesMetadata && { ces: cesMetadata }),
   }
 }
 
@@ -96,7 +96,7 @@ function writeChunk(
     object: 'chat.completion.chunk',
     created: now(),
     model,
-    system_fingerprint: 'godmode-v0.3',
+    system_fingerprint: 'ces-v0.3',
     choices: [{ index: 0, delta, finish_reason }],
     ...(extra || {}),
   }
@@ -114,7 +114,7 @@ interface PipelineResult {
 
 function runPipeline(opts: {
   messages: Array<{ role: string; content: string }>
-  godmode: boolean
+  ces: boolean
   customSystemPrompt?: string
   autotune: boolean
   strategy: string
@@ -135,8 +135,8 @@ function runPipeline(opts: {
   }))
 
   // Build system prompt
-  let systemPrompt = opts.godmode
-    ? (opts.customSystemPrompt || GODMODE_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
+  let systemPrompt = opts.ces
+    ? (opts.customSystemPrompt || CES_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
     : opts.customSystemPrompt || ''
 
   // Conversation continuity directive for multi-turn
@@ -198,9 +198,9 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
     }
   }
 
-  // GODMODE boost
-  if (opts.godmode) {
-    finalParams = applyGodmodeBoost(finalParams)
+  // CES boost
+  if (opts.ces) {
+    finalParams = applyCESBoost(finalParams)
   }
 
   // Parseltongue
@@ -273,9 +273,9 @@ completionsRoutes.post('/completions', async (req, res) => {
       top_k,
       frequency_penalty,
       presence_penalty,
-      // G0DM0D3 extras (use extra_body in OpenAI SDK)
+      // NOVAOS extras (use extra_body in OpenAI SDK)
       openrouter_api_key: caller_key,
-      godmode = true,
+      ces = true,
       custom_system_prompt,
       autotune = true,
       strategy = 'adaptive',
@@ -325,7 +325,7 @@ completionsRoutes.post('/completions', async (req, res) => {
     // ── Run shared pipeline ──────────────────────────────────────────
     const pipeline = runPipeline({
       messages,
-      godmode,
+      ces,
       customSystemPrompt: custom_system_prompt,
       autotune,
       strategy,
@@ -446,7 +446,7 @@ completionsRoutes.post('/completions', async (req, res) => {
         const totalDuration = Date.now() - startTime
         const successCount = scoredResults.filter(r => r.success).length
         writeChunk(res, id, model, {}, 'stop', {
-          godmode: {
+          ces: {
             winner_model: winner?.model || null,
             winner_score: winner?.score || 0,
             race_duration_ms: totalDuration,
@@ -464,7 +464,7 @@ completionsRoutes.post('/completions', async (req, res) => {
           mode: 'ultraplinian',
           tier: raceTier,
           stream: true,
-          pipeline: { godmode, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
+          pipeline: { ces, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
           autotune: pipeline.autotuneResult
             ? { detected_context: pipeline.autotuneResult.detectedContext, confidence: pipeline.autotuneResult.confidence }
             : undefined,
@@ -580,7 +580,7 @@ completionsRoutes.post('/completions', async (req, res) => {
         mode: 'ultraplinian',
         tier: raceTier,
         stream: false,
-        pipeline: { godmode, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
+        pipeline: { ces, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
         autotune: pipeline.autotuneResult
           ? { detected_context: pipeline.autotuneResult.detectedContext, confidence: pipeline.autotuneResult.confidence }
           : undefined,
@@ -610,7 +610,7 @@ completionsRoutes.post('/completions', async (req, res) => {
             duration_ms: r.duration_ms,
           })),
           pipeline: {
-            godmode,
+            ces,
             autotune: pipeline.autotuneResult
               ? {
                   detected_context: pipeline.autotuneResult.detectedContext,
@@ -687,9 +687,9 @@ completionsRoutes.post('/completions', async (req, res) => {
         writeChunk(res, id, model, { content: finalContent.slice(i, i + CHUNK_SIZE) })
       }
       writeChunk(res, id, model, {}, 'stop', {
-        godmode: {
+        ces: {
           pipeline: {
-            godmode,
+            ces,
             autotune: pipeline.autotuneResult
               ? {
                   detected_context: pipeline.autotuneResult.detectedContext,
@@ -710,7 +710,7 @@ completionsRoutes.post('/completions', async (req, res) => {
         endpoint: '/v1/chat/completions',
         mode: 'standard',
         stream: true,
-        pipeline: { godmode, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
+        pipeline: { ces, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
         autotune: pipeline.autotuneResult
           ? { detected_context: pipeline.autotuneResult.detectedContext, confidence: pipeline.autotuneResult.confidence }
           : undefined,
@@ -732,7 +732,7 @@ completionsRoutes.post('/completions', async (req, res) => {
       endpoint: '/v1/chat/completions',
       mode: 'standard',
       stream: false,
-      pipeline: { godmode, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
+      pipeline: { ces, autotune, parseltongue, stm_modules: stm_modules || [], strategy },
       autotune: pipeline.autotuneResult
         ? { detected_context: pipeline.autotuneResult.detectedContext, confidence: pipeline.autotuneResult.confidence }
         : undefined,
@@ -746,7 +746,7 @@ completionsRoutes.post('/completions', async (req, res) => {
     res.json(
       makeChatCompletion(id, model, finalContent, {
         pipeline: {
-          godmode,
+          ces,
           autotune: pipeline.autotuneResult
             ? {
                 detected_context: pipeline.autotuneResult.detectedContext,

@@ -1,13 +1,13 @@
 /**
  * ZDR Metadata Tracker
  *
- * Always-on, privacy-first analytics for G0DM0D3.
+ * Always-on, privacy-first analytics for NOVAOS.
  * Records EVERYTHING about requests — except the actual content.
  *
  * What IS tracked:
  * - Timestamps, endpoints, modes, tiers
  * - Models used, winner model, scores, latencies
- * - Pipeline flags (godmode, autotune, parseltongue, stm)
+ * - Pipeline flags (ces, autotune, parseltongue, stm)
  * - AutoTune detected context type + confidence
  * - Per-model success/failure, response lengths, durations
  * - Error types (categorized, never raw error messages)
@@ -36,7 +36,7 @@ export interface MetadataEvent {
 
   // Pipeline config (what was enabled, not what it produced)
   pipeline: {
-    godmode: boolean
+    ces: boolean
     autotune: boolean
     parseltongue: boolean
     stm_modules: string[]
@@ -176,7 +176,7 @@ export interface MetadataStats {
 
   // Pipeline usage
   pipeline: {
-    godmode_rate: number // % of requests with godmode enabled
+    ces_rate: number // % of requests with ces enabled
     autotune_rate: number
     parseltongue_rate: number
     stm_usage: Record<string, number> // module -> count
@@ -228,7 +228,7 @@ export function getStats(): MetadataStats {
       by_tier: {},
       by_endpoint: {},
       models: { total_queries: 0, unique_models: 0, by_model: {} },
-      pipeline: { godmode_rate: 0, autotune_rate: 0, parseltongue_rate: 0, stm_usage: {}, strategy_usage: {} },
+      pipeline: { ces_rate: 0, autotune_rate: 0, parseltongue_rate: 0, stm_usage: {}, strategy_usage: {} },
       contexts: {},
       latency: { avg_ms: 0, p50_ms: 0, p95_ms: 0, p99_ms: 0 },
       response_lengths: { avg: 0, p50: 0, p95: 0 },
@@ -250,7 +250,7 @@ export function getStats(): MetadataStats {
   const modelData: Record<string, { queries: number; wins: number; scores: number[]; durations: number[]; successes: number }> = {}
 
   // Accumulators
-  let godmodeCount = 0
+  let cesCount = 0
   let autotuneCount = 0
   let parseltongueCount = 0
   let totalModelQueries = 0
@@ -268,7 +268,7 @@ export function getStats(): MetadataStats {
     if (e.tier) byTier[e.tier] = (byTier[e.tier] || 0) + 1
     byEndpoint[e.endpoint] = (byEndpoint[e.endpoint] || 0) + 1
 
-    if (e.pipeline.godmode) godmodeCount++
+    if (e.pipeline.ces) cesCount++
     if (e.pipeline.autotune) autotuneCount++
     if (e.pipeline.parseltongue) parseltongueCount++
     if (e.pipeline.strategy) {
@@ -351,7 +351,7 @@ export function getStats(): MetadataStats {
       by_model: byModel,
     },
     pipeline: {
-      godmode_rate: Math.round((godmodeCount / total) * 100) / 100,
+      ces_rate: Math.round((cesCount / total) * 100) / 100,
       autotune_rate: Math.round((autotuneCount / total) * 100) / 100,
       parseltongue_rate: Math.round((parseltongueCount / total) * 100) / 100,
       stm_usage: stmUsage,

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { useStore } from '@/store'
 import {
@@ -9,12 +10,11 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Zap,
-  Skull,
   Terminal
 } from 'lucide-react'
 import { PersonaSelector } from './PersonaSelector'
 import { ModelSelector } from './ModelSelector'
+import { ModeSelector } from '@/ui/components/ModeSelector'
 
 interface SidebarProps {
   isOpen: boolean
@@ -28,8 +28,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
     createConversation,
     selectConversation,
     deleteConversation,
-    setShowSettings,
-    theme
+    setShowSettings
   } = useStore()
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -54,7 +53,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed md:relative z-40 h-screen
+          fixed md:relative z-40 h-dvh md:h-full
           bg-theme-dim border-r border-theme-primary
           transition-all duration-300 ease-in-out
           ${isOpen ? 'w-72' : 'w-0'}
@@ -67,8 +66,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-2xl relative -top-[2px]">🜏</span>
-                <h1 className="text-xl font-bold theme-primary glitch glow-primary" data-text="G0DM0DƎ">
-                  G0DM0<span className="flipped-e">D</span><span className="flipped-e-soft">E</span>
+                <h1 className="text-xl font-bold theme-primary glitch glow-primary" data-text="CES">
+                  CES
                 </h1>
               </div>
               <button
@@ -83,18 +82,16 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
             {/* New Chat Button */}
             <button
               onClick={handleNewChat}
-              className="w-full flex items-center justify-center gap-2 py-2 px-4
-                border border-theme-primary rounded-lg
-                hover:glow-box transition-all
-                hacker-btn"
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-theme-primary px-4 py-2 transition-all hover:glow-box hacker-btn"
             >
               <Plus className="w-4 h-4" />
               <span>New Chat</span>
             </button>
           </div>
 
-          {/* Model & Persona Selectors */}
+          {/* Mode, Model and Persona */}
           <div className="p-4 border-b border-theme-primary space-y-3">
+            <ModeSelector />
             <ModelSelector />
             <PersonaSelector />
           </div>
@@ -171,8 +168,16 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                 AGPL-3.0 | Forever Free
               </p>
               <p className="text-xs theme-secondary opacity-50 mt-1">
-                Cognition without control
+                CES
               </p>
+              <div className="mt-2 text-xs opacity-75 flex gap-2 justify-center flex-wrap">
+                <Link href="/auth/" className="underline">Auth</Link>
+                <Link href="/billing/" className="underline">Billing</Link>
+                <Link href="/support/" className="underline">Support</Link>
+                <Link href="/admin/evidence/" className="underline">Evidence</Link>
+                <Link href="/privacy-policy/" className="underline">Privacy</Link>
+                <Link href="/terms/" className="underline">Terms</Link>
+              </div>
             </div>
           </div>
         </div>

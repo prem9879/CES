@@ -10,7 +10,482 @@ import type { ClassificationResult } from '@/lib/classify'
 import { computeAutoTuneParams, getContextLabel, getStrategyLabel, PARAM_META } from '@/lib/autotune'
 import type { AutoTuneResult } from '@/lib/autotune'
 import { applyParseltongue, detectTriggers } from '@/lib/parseltongue'
-import { Send, Loader2, StopCircle, SlidersHorizontal } from 'lucide-react'
+import { runCESPipeline } from '@/core/pipeline'
+import type { CESMode } from '@/core/mode-router'
+import { buildAttachmentContext, buildAttachmentFromFile, detectAttachmentType, formatBytes } from '@/lib/multimodal'
+import { isRaceTierAllowed, loadPlanEntitlements } from '@/lib/entitlements'
+import type { MessageAttachment } from '@/types/multimodal'
+import type { WebSpecCitation } from '@/types/webspec'
+import { Send, Loader2, StopCircle, SlidersHorizontal, Paperclip, ImageIcon, FileAudio, FileText, X, Mic, MicOff } from 'lucide-react'
+
+interface SlashCommandResult {
+  mode?: CESMode
+  message: string
+}
+
+function parseSlashCommand(raw: string): SlashCommandResult | null {
+  const text = raw.trim()
+  if (!text.startsWith('/')) return null
+
+  const firstSpace = text.indexOf(' ')
+  const command = (firstSpace === -1 ? text : text.slice(0, firstSpace)).toLowerCase()
+  const remainder = firstSpace === -1 ? '' : text.slice(firstSpace + 1).trim()
+
+  switch (command) {
+    case '/chat':
+      return { mode: 'chat', message: remainder }
+    case '/build':
+      return { mode: 'build', message: remainder }
+    case '/debug':
+      return { mode: 'debug', message: remainder }
+    case '/research':
+      return { mode: 'research', message: remainder }
+    case '/decision':
+      return { mode: 'decision', message: remainder }
+    case '/weather':
+      return { message: `weather ${remainder}`.trim() }
+    case '/spec':
+      return { message: `latest specifications ${remainder}`.trim() }
+    default:
+      return null
+  }
+}
+
+function looksLikeWeatherQuery(text: string): boolean {
+  return /\b(weather|forecast|temperature|rain|rainy|snow|snowy|wind|humidity|sunny|cloudy|storm|conditions?)\b/i.test(text)
+}
+
+function looksLikeWebSpecQuery(text: string): boolean {
+  return /\b(latest|current|compare|comparison|spec|specs|specification|official|release notes|launch|citation|citations|sources?|documentation|docs?|web|research|benchmark|better)\b/i.test(text)
+}
+
+function generateLocalFallbackResponse(prompt: string): string {
+  const text = prompt.trim()
+  const lower = text.toLowerCase()
+
+  const jsLike = /\b(js|javascript|typescript|ts|node|react|next)\b/i.test(text)
+  const pyLike = /\b(python|py)\b/i.test(text)
+
+  if (/\b(debug|fix|error|bug|stack trace|exception)\b/i.test(text)) {
+    return [
+      'Quick local debugging checklist:',
+      '1. Copy the exact error and the line number.',
+      '2. Reproduce with the smallest input.',
+      '3. Add logs before and after the failing line.',
+      '4. Validate assumptions (null/undefined/types/async timing).',
+      '5. Fix one thing at a time, then rerun.',
+      '',
+      'Paste your error message and the failing function, and I will walk through a targeted fix.'
+    ].join('\n')
+  }
+
+  if (/\b(unit test|test case|jest|vitest|pytest|mocha)\b/i.test(text)) {
+    if (pyLike) {
+      return [
+        'Example pytest test:',
+        '',
+        '```python',
+        'def add(a, b):',
+        '    return a + b',
+        '',
+        'def test_add():',
+        '    assert add(2, 3) == 5',
+        '```'
+      ].join('\n')
+    }
+
+    return [
+      'Example Vitest/Jest-style test:',
+      '',
+      '```ts',
+      'import { describe, it, expect } from "vitest"',
+      '',
+      'function add(a: number, b: number) {',
+      '  return a + b',
+      '}',
+      '',
+      'describe("add", () => {',
+      '  it("adds two numbers", () => {',
+      '    expect(add(2, 3)).toBe(5)',
+      '  })',
+      '})',
+      '```'
+    ].join('\n')
+  }
+
+  if (/\bapi\b|\bendpoint\b|\bexpress\b|\bfastapi\b|\bflask\b/i.test(text)) {
+    if (pyLike) {
+      return [
+        'FastAPI starter endpoint:',
+        '',
+        '```python',
+        'from fastapi import FastAPI',
+        '',
+        'app = FastAPI()',
+        '',
+        '@app.get("/health")',
+        'def health():',
+        '    return {"ok": True}',
+        '```'
+      ].join('\n')
+    }
+
+    return [
+      'Express starter endpoint:',
+      '',
+      '```ts',
+      'import express from "express"',
+      '',
+      'const app = express()',
+      'app.use(express.json())',
+      '',
+      'app.get("/health", (_req, res) => {',
+      '  res.json({ ok: true })',
+      '})',
+      '',
+      'app.listen(3000)',
+      '```'
+    ].join('\n')
+  }
+
+  if (/\bsql\b|\bquery\b|\bjoin\b|\bgroup by\b/i.test(text)) {
+    return [
+      'SQL template (top customers by orders):',
+      '',
+      '```sql',
+      'SELECT c.id, c.name, COUNT(o.id) AS orders_count',
+      'FROM customers c',
+      'LEFT JOIN orders o ON o.customer_id = c.id',
+      'GROUP BY c.id, c.name',
+      'ORDER BY orders_count DESC',
+      'LIMIT 10;',
+      '```'
+    ].join('\n')
+  }
+
+  if (/\breact\b|\bcomponent\b|\btsx\b/i.test(text)) {
+    return [
+      'React component template:',
+      '',
+      '```tsx',
+      'type CardProps = { title: string; children: React.ReactNode }',
+      '',
+      'export function Card({ title, children }: CardProps) {',
+      '  return (',
+      '    <section className="rounded-lg border p-4">',
+      '      <h3 className="font-semibold mb-2">{title}</h3>',
+      '      <div>{children}</div>',
+      '    </section>',
+      '  )',
+      '}',
+      '```'
+    ].join('\n')
+  }
+
+  if (/\balgorithm\b|\btwo sum\b|\bbinary search\b|\bcomplexity\b/i.test(text)) {
+    return [
+      'Two Sum (hash map) in TypeScript:',
+      '',
+      '```ts',
+      'function twoSum(nums: number[], target: number): [number, number] | null {',
+      '  const seen = new Map<number, number>()',
+      '  for (let i = 0; i < nums.length; i++) {',
+      '    const need = target - nums[i]',
+      '    if (seen.has(need)) return [seen.get(need)!, i]',
+      '    seen.set(nums[i], i)',
+      '  }',
+      '  return null',
+      '}',
+      '```',
+      'Time: O(n), Space: O(n).'
+    ].join('\n')
+  }
+
+  if (/\bdocker\b|\bdockerfile\b/i.test(text)) {
+    return [
+      'Node Dockerfile starter:',
+      '',
+      '```dockerfile',
+      'FROM node:20-alpine',
+      'WORKDIR /app',
+      'COPY package*.json ./',
+      'RUN npm ci',
+      'COPY . .',
+      'EXPOSE 3000',
+      'CMD ["npm", "run", "start"]',
+      '```'
+    ].join('\n')
+  }
+
+  if (/\bgit\b|\bcommit\b|\bbranch\b|\bmerge\b/i.test(text)) {
+    return [
+      'Common Git flow:',
+      '1. `git checkout -b feature/my-change`',
+      '2. `git add .`',
+      '3. `git commit -m "feat: add my change"`',
+      '4. `git push -u origin feature/my-change`',
+      '5. Open a PR and request review.'
+    ].join('\n')
+  }
+
+  if (/\bpython\b/i.test(text) && /\bhello\s*world\b/i.test(text)) {
+    return [
+      'Here is a Python Hello World program:',
+      '',
+      '```python',
+      'print("Hello, World!")',
+      '```',
+    ].join('\n')
+  }
+
+  if (/\bhello\s*world\b/i.test(text)) {
+    return [
+      'Here is a basic Hello World example:',
+      '',
+      '```python',
+      'print("Hello, World!")',
+      '```',
+    ].join('\n')
+  }
+
+  if (/\bfunction\b|\bwrite code\b|\bsnippet\b|\bboilerplate\b/i.test(lower)) {
+    if (pyLike) {
+      return [
+        'Python function template:',
+        '',
+        '```python',
+        'def solve(input_data):',
+        '    """Describe input/output briefly."""',
+        '    # TODO: implement logic',
+        '    return input_data',
+        '```'
+      ].join('\n')
+    }
+
+    if (jsLike) {
+      return [
+        'TypeScript function template:',
+        '',
+        '```ts',
+        'export function solve(input: unknown) {',
+        '  // TODO: add validation and business logic',
+        '  return input',
+        '}',
+        '```'
+      ].join('\n')
+    }
+  }
+
+  return 'I am currently in local fallback mode because model access is unavailable. I can still help with coding, explanations, debugging steps, and templates. Ask me directly and I will respond without external model calls.'
+}
+
+function errorMessageFromUnknown(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return typeof error === 'string' ? error : 'Unknown error'
+}
+
+function isRecoverableProviderFailure(message: string): boolean {
+  return /api key|invalid|expired|unauthorized|access denied|permission|401|403|credit|insufficient|billing|rate limit|429|network|fetch failed|unavailable|timeout|timed out|502|503|504|5\d\d|bad gateway|service unavailable|gateway timeout|internal server error/i.test(message)
+}
+
+function fallbackReasonFromError(errorMessage: string): string {
+  const lower = errorMessage.toLowerCase()
+  if (/api key|invalid|expired|unauthorized|access denied|permission|401|403/.test(lower)) {
+    return 'Cloud key is invalid or unauthorized. Running in local fallback mode.'
+  }
+  if (/credit|insufficient|billing|quota|budget/.test(lower)) {
+    return 'Cloud credits are unavailable. Running in local fallback mode.'
+  }
+  if (/rate limit|429|too many requests/.test(lower)) {
+    return 'Cloud provider is rate-limiting requests. Running in local fallback mode.'
+  }
+  return 'Cloud provider is unavailable right now. Running in local fallback mode.'
+}
+
+function extractWeatherLocation(text: string): string | null {
+  const patterns = [
+    /\b(?:weather|forecast|temperature|conditions?)\s+(?:in|for|at)\s+([^?.!,\n]+)/i,
+    /\b(?:in|for|at)\s+([^?.!,\n]+)\s+(?:weather|forecast|temperature|conditions?)\b/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern)
+    if (match?.[1]) {
+      const cleaned = match[1].trim().replace(/^(the|my|our)\s+/i, '')
+      if (cleaned) return cleaned
+    }
+  }
+
+  return null
+}
+
+function weatherCodeToText(code: number | null | undefined): string {
+  switch (code) {
+    case 0: return 'clear sky'
+    case 1: return 'mainly clear'
+    case 2: return 'partly cloudy'
+    case 3: return 'overcast'
+    case 45:
+    case 48: return 'foggy'
+    case 51:
+    case 53:
+    case 55: return 'light drizzle'
+    case 56:
+    case 57: return 'freezing drizzle'
+    case 61:
+    case 63:
+    case 65: return 'rain'
+    case 66:
+    case 67: return 'freezing rain'
+    case 71:
+    case 73:
+    case 75: return 'snow'
+    case 77: return 'snow grains'
+    case 80:
+    case 81:
+    case 82: return 'showers'
+    case 85:
+    case 86: return 'snow showers'
+    case 95: return 'thunderstorm'
+    case 96:
+    case 99: return 'thunderstorm with hail'
+    default: return 'unavailable'
+  }
+}
+
+async function fetchJson<T>(url: string, timeoutMs = 5000): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { signal: controller.signal, headers: { accept: 'application/json' } })
+    if (!response.ok) {
+      throw new Error(`Request failed (${response.status})`)
+    }
+    return await response.json() as T
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function lookupApproximateLocation(): Promise<{ city?: string; region?: string; country?: string; latitude: number; longitude: number } | null> {
+  try {
+    const data = await fetchJson<{ success: boolean; city?: string; region?: string; country?: string; latitude?: number; longitude?: number }>('https://ipwho.is/?output=json', 5000)
+    if (!data.success || typeof data.latitude !== 'number' || typeof data.longitude !== 'number') {
+      return null
+    }
+    return {
+      city: data.city,
+      region: data.region,
+      country: data.country,
+      latitude: data.latitude,
+      longitude: data.longitude,
+    }
+  } catch {
+    return null
+  }
+}
+
+interface SpeechRecognitionAlternativeLike {
+  transcript: string
+}
+
+interface SpeechRecognitionResultLike {
+  isFinal: boolean
+  0: SpeechRecognitionAlternativeLike
+}
+
+interface SpeechRecognitionEventLike extends Event {
+  resultIndex: number
+  results: ArrayLike<SpeechRecognitionResultLike>
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null
+  onerror: ((event: Event) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function lookupWeatherSummary(query: string): Promise<string | null> {
+  const explicitLocation = extractWeatherLocation(query)
+  let locationLabel = explicitLocation || ''
+  let latitude: number | null = null
+  let longitude: number | null = null
+
+  if (explicitLocation) {
+    try {
+      const geo = await fetchJson<{ results?: Array<{ name: string; country?: string; admin1?: string; latitude: number; longitude: number }> }>(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(explicitLocation)}&count=1&language=en&format=json`,
+        5000,
+      )
+      const match = geo.results?.[0]
+      if (match) {
+        latitude = match.latitude
+        longitude = match.longitude
+        locationLabel = [match.name, match.admin1, match.country].filter(Boolean).join(', ')
+      }
+    } catch {
+      // Fall through to approximate location.
+    }
+  }
+
+  if (latitude === null || longitude === null) {
+    const approx = await lookupApproximateLocation()
+    if (!approx) return null
+    latitude = approx.latitude
+    longitude = approx.longitude
+    locationLabel = [approx.city, approx.region, approx.country].filter(Boolean).join(', ')
+  }
+
+  const weather = await fetchJson<{
+    current?: {
+      temperature_2m?: number
+      apparent_temperature?: number
+      weather_code?: number
+      wind_speed_10m?: number
+      relative_humidity_2m?: number
+      time?: string
+    }
+    daily?: {
+      temperature_2m_max?: number[]
+      temperature_2m_min?: number[]
+    }
+  }>(
+    `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min&forecast_days=2&timezone=auto`,
+    6000,
+  )
+
+  const current = weather.current
+  if (!current || typeof current.temperature_2m !== 'number') return null
+
+  const todayMax = weather.daily?.temperature_2m_max?.[0]
+  const todayMin = weather.daily?.temperature_2m_min?.[0]
+  const tomorrowMax = weather.daily?.temperature_2m_max?.[1]
+  const tomorrowMin = weather.daily?.temperature_2m_min?.[1]
+  const condition = weatherCodeToText(current.weather_code)
+  const timestamp = current.time ? new Date(current.time).toLocaleString() : 'just now'
+
+  const lines = [
+    `Live weather for ${locationLabel || 'your area'} (${timestamp}):`,
+    `Current: ${Math.round(current.temperature_2m)}°C, feels like ${Math.round(current.apparent_temperature ?? current.temperature_2m)}°C, ${condition}.`,
+    `Wind: ${Math.round(current.wind_speed_10m ?? 0)} km/h. Humidity: ${Math.round(current.relative_humidity_2m ?? 0)}%.`,
+  ]
+
+  if (typeof todayMax === 'number' && typeof todayMin === 'number') {
+    lines.push(`Today: ${Math.round(todayMin)}°C to ${Math.round(todayMax)}°C.`)
+  }
+  if (typeof tomorrowMax === 'number' && typeof tomorrowMin === 'number') {
+    lines.push(`Tomorrow: ${Math.round(tomorrowMin)}°C to ${Math.round(tomorrowMax)}°C.`)
+  }
+
+  lines.push('If you want a different city, tell me the location and I will refresh it live.')
+  return lines.join(' ')
+}
 
 export function ChatInput() {
   const {
@@ -19,6 +494,7 @@ export function ChatInput() {
     addMessage,
     updateMessageContent,
     apiKey,
+    defaultModel,
     isStreaming,
     setIsStreaming,
     personas,
@@ -32,6 +508,7 @@ export function ChatInput() {
     feedbackState,
     memories,
     memoriesEnabled,
+    addMemory,
     parseltongueConfig,
     customSystemPrompt,
     useCustomSystemPrompt,
@@ -53,6 +530,8 @@ export function ChatInput() {
     setUltraplinianProgress,
     setUltraplinianRacing,
     resetUltraplinianRace,
+    taskMode,
+    setPipelineTelemetry,
     // CONSORTIUM
     consortiumEnabled,
     consortiumTier,
@@ -62,16 +541,111 @@ export function ChatInput() {
     setConsortiumPhase,
     setConsortiumProgress,
     resetConsortium,
+    setRuntimeStatus,
+    setTaskMode,
   } = useStore()
 
   const [input, setInput] = useState('')
+  const [pendingAttachments, setPendingAttachments] = useState<MessageAttachment[]>([])
+  const [attachmentError, setAttachmentError] = useState<string | null>(null)
+  const [isVoiceInputActive, setIsVoiceInputActive] = useState(false)
   const [showTuneDetails, setShowTuneDetails] = useState(false)
   const [parseltonguePreview, setParseltonguePreview] = useState<{
     triggersFound: string[]
     transformed: boolean
   } | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const speechRecognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  const removeAttachment = (attachmentId: string) => {
+    setPendingAttachments(prev => prev.filter(att => att.id !== attachmentId))
+  }
+
+  const handleAttachmentFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    const selectedFiles = Array.from(files)
+    const supported = selectedFiles.filter(file => detectAttachmentType(file) !== null)
+    if (supported.length === 0) {
+      setAttachmentError('Only image, audio, and PDF files are supported.')
+      return
+    }
+
+    const availableSlots = Math.max(0, 6 - pendingAttachments.length)
+    const filesToProcess = supported.slice(0, availableSlots)
+    if (filesToProcess.length === 0) {
+      setAttachmentError('Attachment limit reached (max 6). Remove one to add more.')
+      return
+    }
+
+    setAttachmentError(null)
+
+    try {
+      const built = await Promise.all(
+        filesToProcess.map(async (file) => {
+          if (file.size > 20 * 1024 * 1024) {
+            throw new Error(`"${file.name}" exceeds the 20MB limit.`)
+          }
+          return buildAttachmentFromFile(file, {
+            apiBaseUrl: proxyApiBase,
+            cesApiKey: proxyAuthKey,
+          })
+        })
+      )
+      setPendingAttachments(prev => [...prev, ...built])
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to process attachment.'
+      setAttachmentError(message)
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleStartVoiceInput = () => {
+    if (isVoiceInputActive) {
+      speechRecognitionRef.current?.stop()
+      setIsVoiceInputActive(false)
+      return
+    }
+
+    const speechWindow = window as Window & {
+      SpeechRecognition?: new () => SpeechRecognitionLike
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike
+    }
+    const SpeechRecognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition
+
+    if (!SpeechRecognitionCtor) {
+      setAttachmentError('Voice input is not supported in this browser.')
+      return
+    }
+
+    const recognition = new SpeechRecognitionCtor()
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.lang = 'en-US'
+    recognition.onresult = (event) => {
+      let transcript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript
+      }
+      setInput(prev => (prev ? `${prev} ${transcript}`.trim() : transcript.trim()))
+    }
+    recognition.onerror = () => {
+      setAttachmentError('Voice input failed. Please try again or upload an audio file.')
+    }
+    recognition.onend = () => {
+      setIsVoiceInputActive(false)
+    }
+
+    speechRecognitionRef.current = recognition
+    setAttachmentError(null)
+    setIsVoiceInputActive(true)
+    recognition.start()
+  }
 
   // Auto-resize textarea
   useEffect(() => {
@@ -80,6 +654,12 @@ export function ChatInput() {
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`
     }
   }, [input])
+
+  useEffect(() => {
+    return () => {
+      speechRecognitionRef.current?.stop()
+    }
+  }, [])
 
   // Live preview: compute autotune params as user types (debounced)
   const [livePreview, setLivePreview] = useState<AutoTuneResult | null>(null)
@@ -90,7 +670,6 @@ export function ChatInput() {
     }
 
     const timer = setTimeout(() => {
-      const persona = personas.find(p => p.id === currentConversation?.persona) || personas[0]
       const history = (currentConversation?.messages || []).map(m => ({
         role: m.role,
         content: m.content
@@ -132,32 +711,89 @@ export function ChatInput() {
     return () => clearTimeout(timer)
   }, [input, parseltongueConfig])
 
-  // Proxy mode: when no personal OpenRouter key, route through self-hosted API
-  const proxyMode = !apiKey && !!ultraplinianApiUrl && !!ultraplinianApiKey
+  // Default to local API proxy when no personal key is set.
+  const proxyApiBase = ultraplinianApiUrl || 'http://localhost:7860'
+  const hasProxyServer = Boolean(proxyApiBase)
+  const proxyMode = !apiKey && hasProxyServer
+  const proxyAuthKey = ultraplinianApiKey || apiKey || 'local-dev-mode'
+  const localCesMode = !apiKey && !proxyMode
+
+  useEffect(() => {
+    if (apiKey) {
+      setRuntimeStatus('cloud', 'Using your OpenRouter API key.')
+      return
+    }
+    if (proxyMode) {
+      setRuntimeStatus('proxy', 'No personal key detected. Using server proxy mode.')
+      return
+    }
+    if (localCesMode) {
+      setRuntimeStatus('fallback', 'No API key or proxy server available. Local fallback only.')
+    }
+  }, [apiKey, proxyMode, localCesMode, setRuntimeStatus])
 
   const handleSubmit = async () => {
-    if (!input.trim() || !currentConversationId || isStreaming) return
-    if (!apiKey && !proxyMode) return
+    if (!currentConversationId || isStreaming) return
 
-    const originalMessage = input.trim()
+    const parsed = parseSlashCommand(input)
+    const resolvedInput = parsed ? parsed.message : input.trim()
+    if (!resolvedInput && pendingAttachments.length === 0) return
+
+    if (parsed?.mode) {
+      setTaskMode(parsed.mode)
+    }
+
+    const entitlements = await loadPlanEntitlements()
+    if (entitlements.enforceInApp) {
+      if (consortiumEnabled && !entitlements.features.consortiumEnabled) {
+        setAttachmentError('CONSORTIUM requires Pro or Enterprise. Upgrade in Billing to continue.')
+        return
+      }
+
+      if (ultraplinianEnabled && !isRaceTierAllowed(ultraplinianTier, entitlements.features.maxRaceTier)) {
+        setAttachmentError(
+          `Your ${entitlements.plan.toUpperCase()} plan allows ULTRAPLINIAN up to ${entitlements.features.maxRaceTier.toUpperCase()}. Upgrade to continue.`,
+        )
+        return
+      }
+
+      if (consortiumEnabled && !isRaceTierAllowed(consortiumTier, entitlements.features.maxRaceTier)) {
+        setAttachmentError(
+          `Your ${entitlements.plan.toUpperCase()} plan allows CONSORTIUM up to ${entitlements.features.maxRaceTier.toUpperCase()}. Upgrade to continue.`,
+        )
+        return
+      }
+    }
+
+    const originalMessage = resolvedInput
+    const submittedAttachments = pendingAttachments
     setInput('')
+    setPendingAttachments([])
+    setAttachmentError(null)
     setIsStreaming(true)
     incrementPromptsTried()
 
     // Apply parseltongue obfuscation if enabled
     const parseltongueResult = applyParseltongue(originalMessage, parseltongueConfig)
     const userMessage = parseltongueResult.transformedText
+    const multimodalContext = buildAttachmentContext(submittedAttachments)
+    const outboundUserMessage = multimodalContext
+      ? `${userMessage || 'User shared multimodal attachments.'}\n\n${multimodalContext}`
+      : userMessage
+    let webSpecCitations: WebSpecCitation[] = []
+    let webSpecContext = ''
 
 
     // Add user message (show original to user, send transformed to API)
     addMessage(currentConversationId, {
       role: 'user',
-      content: originalMessage  // Show original message in UI
+      content: originalMessage || 'Shared multimodal attachments.',  // Show original message in UI
+      attachments: submittedAttachments,
     })
 
     // Get persona and model
     const persona = personas.find(p => p.id === currentConversation?.persona) || personas[0]
-    const model = currentConversation?.model || 'anthropic/claude-3-opus'
+    const model = currentConversation?.model || defaultModel
 
     // Build memory context if enabled
     const activeMemories = memoriesEnabled ? memories.filter(m => m.active) : []
@@ -183,9 +819,52 @@ export function ChatInput() {
       memoryContext += '</user_memory>\n'
     }
 
-    // Build system prompt with GODMODE prompt + memory
+    // Build system prompt with CES prompt + memory
     const basePrompt = useCustomSystemPrompt ? customSystemPrompt : (persona.systemPrompt || persona.coreDirective || '')
     const systemPrompt = basePrompt + memoryContext
+
+    // CES pipeline planning (intent -> mode -> agents -> fusion -> decision -> execution)
+    const memoryHints = activeMemories.map((m) => m.content)
+    const priorBuilds = activeMemories
+      .map((m) => m.content)
+      .filter((m) => m.toLowerCase().includes('build'))
+      .slice(0, 5)
+
+    let cesPipeline: Awaited<ReturnType<typeof runCESPipeline>> | null = null
+    try {
+      cesPipeline = await runCESPipeline({
+        prompt: originalMessage,
+        preferredMode: taskMode,
+        memoryContext: memoryHints,
+        pastBuilds: priorBuilds
+      })
+      setPipelineTelemetry(cesPipeline.intent, cesPipeline.mode, cesPipeline.steps)
+    } catch {
+      setPipelineTelemetry('chat', taskMode, ['CES pipeline fallback activated'])
+    }
+
+    if (looksLikeWebSpecQuery(originalMessage)) {
+      try {
+        const response = await fetch(`${proxyApiBase}/v1/chat/web-spec`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${proxyAuthKey}`,
+          },
+          body: JSON.stringify({ query: originalMessage }),
+          signal: abortControllerRef.current?.signal,
+        })
+
+        if (response.ok) {
+          const payload = await response.json() as { citations?: WebSpecCitation[]; context?: string }
+          webSpecCitations = payload.citations || []
+          webSpecContext = payload.context || ''
+        }
+      } catch {
+        webSpecCitations = []
+        webSpecContext = ''
+      }
+    }
 
     // Build messages array
     const messages = [
@@ -197,16 +876,80 @@ export function ChatInput() {
         content: m.content
       }))),
       // New user message
-      { role: 'user' as const, content: userMessage }
+      { role: 'user' as const, content: webSpecContext ? `${outboundUserMessage}\n\n${webSpecContext}` : outboundUserMessage }
     ]
 
     // Classify prompt for research telemetry
     // Regex runs instantly as fallback; LLM classifier fires in parallel
     // with the main model call and overwrites with a more accurate result.
-    let promptClassification: ClassificationResult = classifyPrompt(userMessage)
+    let promptClassification: ClassificationResult = classifyPrompt(outboundUserMessage)
     const llmClassifyPromise = apiKey
-      ? classifyWithLLM(userMessage, apiKey).then(result => { promptClassification = result })
+      ? classifyWithLLM(outboundUserMessage, apiKey).then(result => { promptClassification = result })
       : Promise.resolve()
+
+    const weatherQuery = looksLikeWeatherQuery(originalMessage)
+
+    if (weatherQuery) {
+      try {
+        const assistantMsgId = addMessage(currentConversationId, {
+          role: 'assistant',
+          content: 'Checking live weather...',
+          model: 'live-weather',
+          persona: persona.id,
+        })
+
+        const response = await fetch('http://localhost:7860/v1/chat/live-weather', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: originalMessage }),
+          signal: abortControllerRef.current?.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Weather lookup failed (${response.status})`)
+        }
+
+        const payload = await response.json() as { content?: string }
+        const liveWeather = payload.content?.trim()
+        if (!liveWeather) {
+          throw new Error('Unable to determine live weather for that location.')
+        }
+
+        updateMessageContent(currentConversationId, assistantMsgId, liveWeather, {
+          model: 'live-weather',
+          persona: persona.id,
+          ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
+        })
+
+        recordChatEvent({
+          mode: 'standard',
+          model: 'live-weather',
+          duration_ms: 0,
+          response_length: liveWeather.length,
+          success: true,
+          pipeline: {
+            autotune: false,
+            parseltongue: false,
+            stm_modules: [],
+            ces: false,
+          },
+          classification: promptClassification,
+          persona: persona.id,
+          prompt_length: originalMessage.length,
+          conversation_depth: currentConversation?.messages?.length || 0,
+          memory_count: activeMemories.length,
+          no_log: noLogMode,
+          parseltongue_transformed: false,
+        })
+
+        setIsStreaming(false)
+        return
+      } catch {
+        // Fall through to the normal model path if live weather lookup fails.
+      }
+    }
 
     // Compute AutoTune parameters if enabled
     let tuneResult: AutoTuneResult | null = null
@@ -227,11 +970,13 @@ export function ChatInput() {
       setAutoTuneLastResult(tuneResult)
     }
 
+    let runLocalFallback: ((cause: string) => Promise<void>) | null = null
+
     try {
       abortControllerRef.current = new AbortController()
 
       // ── CONSORTIUM PATH: Hive-mind synthesis ──────────────────────
-      if (consortiumEnabled && ultraplinianApiUrl && ultraplinianApiKey && !ultraplinianEnabled) {
+      if (consortiumEnabled && ultraplinianApiUrl && !ultraplinianEnabled) {
         const assistantMsgId = addMessage(currentConversationId, {
           role: 'assistant',
           content: '',
@@ -246,8 +991,8 @@ export function ChatInput() {
           {
             messages,
             openrouterApiKey: apiKey,
-            apiBaseUrl: ultraplinianApiUrl,
-            godmodeApiKey: ultraplinianApiKey,
+            apiBaseUrl: proxyApiBase,
+            cesApiKey: proxyAuthKey,
             tier: consortiumTier,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             liquid: liquidResponseEnabled,
@@ -288,6 +1033,7 @@ export function ChatInput() {
 
               updateMessageContent(currentConversationId, assistantMsgId, finalContent, {
                 model: `consortium (${orchModel})`,
+                ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
                 ...(tuneResult ? {
                   autoTuneParams: tuneResult.params,
                   autoTuneContext: tuneResult.detectedContext,
@@ -311,7 +1057,7 @@ export function ChatInput() {
       }
 
       // ── ULTRAPLINIAN PATH: Multi-model race with liquid response ──
-      if (ultraplinianEnabled && ultraplinianApiUrl && ultraplinianApiKey) {
+      if (ultraplinianEnabled && ultraplinianApiUrl) {
         // Add placeholder assistant message that we'll update live
         const assistantMsgId = addMessage(currentConversationId, {
           role: 'assistant',
@@ -330,8 +1076,8 @@ export function ChatInput() {
           {
             messages,
             openrouterApiKey: apiKey,
-            apiBaseUrl: ultraplinianApiUrl,
-            godmodeApiKey: ultraplinianApiKey,
+            apiBaseUrl: proxyApiBase,
+            cesApiKey: proxyAuthKey,
             tier: ultraplinianTier,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             liquid: liquidResponseEnabled,
@@ -358,6 +1104,7 @@ export function ChatInput() {
               setUltraplinianLive(data.content, data.model, data.score)
               updateMessageContent(currentConversationId, assistantMsgId, data.content, {
                 model: data.model,
+                ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
               })
             },
             onComplete: async (data) => {
@@ -387,6 +1134,7 @@ export function ChatInput() {
               updateMessageContent(currentConversationId, assistantMsgId, finalContent, {
                 model: winnerModel,
                 raceResponses: raceResponses.length > 1 ? raceResponses : undefined,
+                ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
                 ...(tuneResult ? {
                   autoTuneParams: tuneResult.params,
                   autoTuneContext: tuneResult.detectedContext,
@@ -412,7 +1160,7 @@ export function ChatInput() {
                   parseltongue: parseltongueConfig.enabled,
                   stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
                   strategy: autoTuneStrategy,
-                  godmode: true,
+                  ces: true,
                 },
                 ...(tuneResult ? {
                   autotune: {
@@ -451,13 +1199,167 @@ export function ChatInput() {
         )
       } else {
         // ── STANDARD PATH: Single model ────────────────────────────
+        const stageMessageId = addMessage(currentConversationId, {
+          role: 'assistant',
+          content: 'Thinking...',
+          model,
+          persona: persona.id,
+        })
+
+        const renderEvolution = async (draft: string, refined: string, final: string, responseModel: string) => {
+          if (taskMode === 'chat') {
+            updateMessageContent(
+              currentConversationId,
+              stageMessageId,
+              final,
+              {
+                model: responseModel,
+                persona: persona.id,
+                ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
+                ...(tuneResult ? {
+                  autoTuneParams: tuneResult.params,
+                  autoTuneContext: tuneResult.detectedContext,
+                  autoTuneContextScores: tuneResult.contextScores,
+                  autoTunePatternMatches: tuneResult.patternMatches,
+                  autoTuneDeltas: tuneResult.paramDeltas
+                } : {})
+              }
+            )
+            return
+          }
+
+          updateMessageContent(
+            currentConversationId,
+            stageMessageId,
+            `### Draft\n${draft}`,
+            { model: responseModel, persona: persona.id }
+          )
+          await new Promise((resolve) => setTimeout(resolve, 120))
+
+          updateMessageContent(
+            currentConversationId,
+            stageMessageId,
+            `### Draft\n${draft}\n\n### Refined\n${refined}`,
+            { model: responseModel, persona: persona.id }
+          )
+          await new Promise((resolve) => setTimeout(resolve, 120))
+
+          updateMessageContent(
+            currentConversationId,
+            stageMessageId,
+            `### Draft\n${draft}\n\n### Refined\n${refined}\n\n### Final\n${final}`,
+            {
+              model: responseModel,
+              persona: persona.id,
+              ...(tuneResult ? {
+                autoTuneParams: tuneResult.params,
+                autoTuneContext: tuneResult.detectedContext,
+                autoTuneContextScores: tuneResult.contextScores,
+                autoTunePatternMatches: tuneResult.patternMatches,
+                autoTuneDeltas: tuneResult.paramDeltas
+              } : {})
+            }
+          )
+        }
+
+        if (localCesMode) {
+          setRuntimeStatus('fallback', 'No API key or proxy server available. Local fallback only.')
+          const final = generateLocalFallbackResponse(originalMessage)
+          const draft = 'Local fallback generated a direct response.'
+          const refined = final
+          const responseModel = 'CES Local'
+
+          await renderEvolution(draft, refined, final, responseModel)
+
+          if (taskMode === 'build') {
+            addMemory({
+              type: 'fact',
+              content: `Build generated: ${originalMessage}`,
+              source: 'auto',
+              active: true,
+            })
+          }
+
+          await llmClassifyPromise
+          recordChatEvent({
+            mode: taskMode === 'build' ? 'build' : 'standard',
+            model: responseModel,
+            duration_ms: 0,
+            response_length: final.length,
+            success: true,
+            pipeline: {
+              autotune: autoTuneEnabled,
+              parseltongue: parseltongueConfig.enabled,
+              stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
+              strategy: autoTuneStrategy,
+              ces: useCustomSystemPrompt,
+            },
+            classification: promptClassification,
+            persona: persona.id,
+            prompt_length: originalMessage.length,
+            conversation_depth: currentConversation?.messages?.length || 0,
+            memory_count: activeMemories.length,
+            no_log: noLogMode,
+            parseltongue_transformed: parseltongueResult.triggersFound.length > 0,
+          })
+
+          setIsStreaming(false)
+          return
+        }
+
         const startTime = Date.now()
-        const response = proxyMode
-          ? await sendMessageViaProxy({
+        let response: string
+
+        runLocalFallback = async (cause: string) => {
+          setRuntimeStatus('fallback', fallbackReasonFromError(cause))
+          const fallback = generateLocalFallbackResponse(originalMessage)
+          const responseModel = 'CES Local'
+
+          await renderEvolution('Local fallback generated a direct response.', fallback, fallback, responseModel)
+
+          if (taskMode === 'build') {
+            addMemory({
+              type: 'fact',
+              content: `Build generated: ${originalMessage}`,
+              source: 'auto',
+              active: true,
+            })
+          }
+
+          await llmClassifyPromise
+          recordChatEvent({
+            mode: taskMode === 'build' ? 'build' : 'standard',
+            model: responseModel,
+            duration_ms: 0,
+            response_length: fallback.length,
+            success: true,
+            pipeline: {
+              autotune: autoTuneEnabled,
+              parseltongue: parseltongueConfig.enabled,
+              stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
+              strategy: autoTuneStrategy,
+              ces: useCustomSystemPrompt,
+            },
+            classification: promptClassification,
+            persona: persona.id,
+            prompt_length: originalMessage.length,
+            conversation_depth: currentConversation?.messages?.length || 0,
+            memory_count: activeMemories.length,
+            no_log: noLogMode,
+            parseltongue_transformed: parseltongueResult.triggersFound.length > 0,
+          })
+
+          setIsStreaming(false)
+        }
+
+        if (proxyMode) {
+          try {
+            setRuntimeStatus('proxy', 'Routing request through server proxy mode.')
+            response = await sendMessageViaProxy({
               messages,
               model,
-              apiBaseUrl: ultraplinianApiUrl,
-              godmodeApiKey: ultraplinianApiKey,
+              apiBaseUrl: proxyApiBase,
+              cesApiKey: proxyAuthKey,
               signal: abortControllerRef.current.signal,
               stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
               ...(tuneResult ? {
@@ -469,7 +1371,17 @@ export function ChatInput() {
                 repetition_penalty: tuneResult.params.repetition_penalty,
               } : {}),
             })
-          : await sendMessage({
+          } catch (proxyError: unknown) {
+            const proxyMessage = errorMessageFromUnknown(proxyError)
+            if (isRecoverableProviderFailure(proxyMessage) && runLocalFallback) {
+              await runLocalFallback(proxyMessage)
+              return
+            }
+            throw proxyError
+          }
+        } else {
+          try {
+            response = await sendMessage({
               messages,
               model,
               apiKey,
@@ -484,6 +1396,33 @@ export function ChatInput() {
                 repetition_penalty: tuneResult.params.repetition_penalty
               } : {})
             })
+            setRuntimeStatus('cloud', 'Using your OpenRouter API key.')
+          } catch (directError: unknown) {
+            const message = String(directError instanceof Error ? directError.message : '').toLowerCase()
+            const authFailure = /api key|invalid|expired|unauthorized|access denied|permission|401|403/.test(message)
+            if (!hasProxyServer || !authFailure) {
+              throw directError
+            }
+
+            setRuntimeStatus('proxy', 'Cloud key failed. Auto-switched to server proxy mode.')
+            response = await sendMessageViaProxy({
+              messages,
+              model,
+              apiBaseUrl: proxyApiBase,
+              cesApiKey: proxyAuthKey,
+              signal: abortControllerRef.current.signal,
+              stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
+              ...(tuneResult ? {
+                temperature: tuneResult.params.temperature,
+                top_p: tuneResult.params.top_p,
+                top_k: tuneResult.params.top_k,
+                frequency_penalty: tuneResult.params.frequency_penalty,
+                presence_penalty: tuneResult.params.presence_penalty,
+                repetition_penalty: tuneResult.params.repetition_penalty,
+              } : {}),
+            })
+          }
+        }
         const durationMs = Date.now() - startTime
 
         // Apply STM transformations
@@ -494,19 +1433,10 @@ export function ChatInput() {
           }
         }
 
-        addMessage(currentConversationId, {
-          role: 'assistant',
-          content: transformedResponse,
-          model,
-          persona: persona.id,
-          ...(tuneResult ? {
-            autoTuneParams: tuneResult.params,
-            autoTuneContext: tuneResult.detectedContext,
-            autoTuneContextScores: tuneResult.contextScores,
-            autoTunePatternMatches: tuneResult.patternMatches,
-            autoTuneDeltas: tuneResult.paramDeltas
-          } : {})
-        })
+        const refined = transformedResponse
+        const final = transformedResponse
+
+        await renderEvolution(cesPipeline?.draft || 'Draft created.', refined, final, model)
 
         // Wait for LLM classification to land (usually already resolved)
         await llmClassifyPromise
@@ -523,7 +1453,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           ...(tuneResult ? {
             autotune: {
@@ -545,9 +1475,10 @@ export function ChatInput() {
           parseltongue_transformed: parseltongueResult.triggersFound.length > 0,
         })
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       resetUltraplinianRace()
-      if (error.name === 'AbortError') {
+      const errorName = error instanceof Error ? error.name : ''
+      if (errorName === 'AbortError') {
         addMessage(currentConversationId, {
           role: 'assistant',
           content: '_[Response stopped by user]_',
@@ -566,7 +1497,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           classification: promptClassification,
           persona: persona.id,
@@ -577,8 +1508,7 @@ export function ChatInput() {
           parseltongue_transformed: parseltongueResult.triggersFound.length > 0,
         })
       } else {
-        console.error('Error sending message:', error)
-        const errMsg = error.message || 'Failed to get response. Check your API key in Settings and try again.'
+        const errMsg = errorMessageFromUnknown(error)
         const errLower = errMsg.toLowerCase()
         const errorType = errLower.includes('api key') || errLower.includes('expired') || errLower.includes('denied') || errLower.includes('permission')
           ? 'auth'
@@ -591,11 +1521,20 @@ export function ChatInput() {
           : errLower.includes('credit') || errLower.includes('insufficient')
           ? 'billing'
           : 'unknown'
+
+        const shouldUseLocalFallback = isRecoverableProviderFailure(errMsg)
+        if (shouldUseLocalFallback && runLocalFallback) {
+          await runLocalFallback(errMsg)
+          return
+        }
+
+        console.error('Error sending message:', error)
         addMessage(currentConversationId, {
           role: 'assistant',
           content: `**Error:** ${errMsg}`,
           model,
-          persona: persona.id
+          persona: persona.id,
+          ...(webSpecCitations.length > 0 ? { citations: webSpecCitations } : {}),
         })
         recordChatEvent({
           mode: ultraplinianEnabled ? 'ultraplinian' : 'standard',
@@ -609,7 +1548,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           classification: promptClassification,
           persona: persona.id,
@@ -754,15 +1693,106 @@ export function ChatInput() {
           </div>
         )}
 
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="image/*,audio/*,application/pdf"
+          className="hidden"
+          onChange={(e) => handleAttachmentFiles(e.target.files)}
+        />
+
+        {pendingAttachments.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {pendingAttachments.map((attachment) => (
+              <div
+                key={attachment.id}
+                className="inline-flex items-center gap-1 rounded-md border border-theme-primary/60 bg-theme-bg px-2 py-1 text-xs"
+              >
+                {attachment.type === 'image' && <ImageIcon className="h-3.5 w-3.5 text-cyan-400" />}
+                {attachment.type === 'audio' && <FileAudio className="h-3.5 w-3.5 text-orange-400" />}
+                {attachment.type === 'pdf' && <FileText className="h-3.5 w-3.5 text-purple-400" />}
+                <span className="max-w-[200px] truncate" title={attachment.name}>{attachment.name}</span>
+                <span className="theme-secondary">({formatBytes(attachment.sizeBytes)})</span>
+                <button
+                  onClick={() => removeAttachment(attachment.id)}
+                  className="rounded p-0.5 hover:bg-theme-accent"
+                  aria-label={`Remove ${attachment.name}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {attachmentError && (
+          <div className="mb-2 text-xs text-red-400">{attachmentError}</div>
+        )}
+
+        <div className="mb-2 flex flex-wrap gap-2 text-xs">
+          <button
+            onClick={() => setInput('/build Build a production-ready API with auth, tests, and docs')}
+            className="rounded-md border border-theme-primary/50 bg-theme-bg px-2 py-1 hover:glow-box transition-all"
+            type="button"
+          >
+            /build template
+          </button>
+          <button
+            onClick={() => setInput('/debug Fix this error with root cause and patch steps')}
+            className="rounded-md border border-theme-primary/50 bg-theme-bg px-2 py-1 hover:glow-box transition-all"
+            type="button"
+          >
+            /debug template
+          </button>
+          <button
+            onClick={() => setInput('/research Compare two options with tradeoffs and recommendation')}
+            className="rounded-md border border-theme-primary/50 bg-theme-bg px-2 py-1 hover:glow-box transition-all"
+            type="button"
+          >
+            /research template
+          </button>
+          <button
+            onClick={() => setInput('/weather in New York')}
+            className="rounded-md border border-theme-primary/50 bg-theme-bg px-2 py-1 hover:glow-box transition-all"
+            type="button"
+          >
+            /weather
+          </button>
+        </div>
+
         <div className="flex items-end gap-3">
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="p-2 bg-theme-bg border border-theme-primary rounded-lg hover:glow-box transition-all"
+              aria-label="Attach image, audio, or PDF"
+              title="Attach image, audio, or PDF"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleStartVoiceInput}
+              className={`p-2 border rounded-lg transition-all ${isVoiceInputActive
+                ? 'bg-red-500/20 border-red-500 text-red-400'
+                : 'bg-theme-bg border-theme-primary hover:glow-box'}`}
+              aria-label={isVoiceInputActive ? 'Stop voice input' : 'Start voice input'}
+              title={isVoiceInputActive ? 'Stop voice input' : 'Start voice input'}
+            >
+              {isVoiceInputActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          </div>
+
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={(apiKey || proxyMode) ? "Enter your message... (Shift+Enter for new line)" : "Set your API key in Settings first"}
-              disabled={(!apiKey && !proxyMode) || isStreaming}
+              placeholder={(apiKey || proxyMode || localCesMode)
+                ? "Enter your message, or attach image/audio/PDF... (Shift+Enter for new line)"
+                : "Enter your message..."}
+              disabled={isStreaming}
               rows={1}
               className="w-full px-4 py-3 pr-12 bg-theme-bg border border-theme-primary rounded-lg
                 resize-none focus:outline-none focus:glow-box
@@ -792,7 +1822,7 @@ export function ChatInput() {
           ) : (
             <button
               onClick={handleSubmit}
-              disabled={!input.trim() || (!apiKey && !proxyMode)}
+              disabled={!input.trim() && pendingAttachments.length === 0}
               className="p-3 bg-theme-accent border border-theme-primary rounded-lg
                 hover:glow-box transition-all
                 disabled:opacity-50 disabled:cursor-not-allowed"

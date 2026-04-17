@@ -1,0 +1,90 @@
+:root {
+  --ces-bg: #03131f;
+  --ces-surface: rgba(11, 36, 53, 0.72);
+  --ces-text: #d8f3ff;
+  --ces-border: rgba(110, 214, 255, 0.28);
+  --ces-accent: #81dcff;
+  --ces-highlight: #78ffca;
+  --ces-shadow: rgba(2, 8, 14, 0.7);
+}
+
+.bg-ice-gradient {
+  background:
+    radial-gradient(circle at 20% 15%, rgba(92, 204, 255, 0.15), transparent 38%),
+    radial-gradient(circle at 80% 0%, rgba(44, 101, 155, 0.25), transparent 34%),
+    radial-gradient(circle at 72% 78%, rgba(120, 255, 202, 0.12), transparent 33%),
+    linear-gradient(180deg, #020b13 0%, #03131f 60%, #051a2a 100%);
+}
+
+.ces-glass {
+  background: var(--ces-surface);
+  border: 1px solid var(--ces-border);
+  backdrop-filter: blur(10px);
+}
+
+.ces-shell {
+  position: relative;
+  overflow: hidden;
+}
+
+.ces-shell::before,
+.ces-shell::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ces-shell::before {
+  width: 56rem;
+  height: 56rem;
+  right: -20rem;
+  top: -26rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(129, 220, 255, 0.22), rgba(129, 220, 255, 0.02) 62%, transparent 70%);
+  animation: ces-float 14s ease-in-out infinite;
+}
+
+.ces-shell::after {
+  width: 44rem;
+  height: 44rem;
+  left: -18rem;
+  bottom: -18rem;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(120, 255, 202, 0.18), rgba(120, 255, 202, 0.03) 60%, transparent 68%);
+  animation: ces-float 17s ease-in-out infinite reverse;
+}
+
+.ces-layer {
+  position: relative;
+  z-index: 1;
+}
+
+.ces-panel {
+  box-shadow: 0 22px 60px -30px var(--ces-shadow);
+}
+
+.ces-reveal {
+  animation: ces-rise-in 420ms ease-out;
+}
+
+@keyframes ces-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ces-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, 14px, 0);
+  }
+}

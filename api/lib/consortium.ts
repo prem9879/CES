@@ -1,7 +1,7 @@
 /**
  * CONSORTIUM Engine
  *
- * The hive-mind mode of G0DM0D3. Instead of racing models to pick a single winner
+ * The hive-mind mode of NOVAOS. Instead of racing models to pick a single winner
  * (ULTRAPLINIAN), CONSORTIUM collects ALL responses and feeds them to a strong
  * orchestrator model that synthesizes ground truth from the collective intelligence.
  *

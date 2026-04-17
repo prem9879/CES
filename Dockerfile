@@ -1,16 +1,16 @@
-# G0DM0D3 Research Preview API
+# CES API
 # Deploy on Hugging Face Spaces (Docker SDK) or any container host.
 #
-# Build:  docker build -t g0dm0d3-api .
+# Build:  docker build -t ces-api .
 # Run:    docker run -p 7860:7860 \
 #           -e OPENROUTER_API_KEY=sk-or-... \
-#           -e GODMODE_API_KEY=your-secret-key \
-#           g0dm0d3-api
+#           -e CES_API_KEY=your-secret-key \
+#           ces-api
 #
 # OPENROUTER_API_KEY: Your OpenRouter key (powers all model calls)
-# GODMODE_API_KEY:    Auth key callers must send as Bearer token
+# CES_API_KEY:    Auth key callers must send as Bearer token
 # HF_TOKEN:           HuggingFace write token for auto-publishing data
-# HF_DATASET_REPO:    Target HF dataset repo (e.g. LYS10S/g0dm0d3-research)
+# HF_DATASET_REPO:    Target HF dataset repo (e.g. your-org/ces-research)
 
 FROM node:20-slim
 

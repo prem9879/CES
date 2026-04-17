@@ -2,11 +2,11 @@
  * Tier System — Enterprise Paywall
  *
  * Three tiers: free, pro, enterprise.
- * Keys are mapped to tiers via GODMODE_TIER_KEYS env var.
+ * Keys are mapped to tiers via Cognitive Execution System (CES)_TIER_KEYS env var (CES_TIER_KEYS is also supported).
  *
- * Format:  GODMODE_TIER_KEYS="enterprise:sk-ent-xxx,pro:sk-pro-yyy,pro:sk-pro-zzz"
+ * Format:  Cognitive Execution System (CES)_TIER_KEYS="enterprise:sk-ent-xxx,pro:sk-pro-yyy,pro:sk-pro-zzz"
  *
- * Any key in GODMODE_API_KEY(S) that isn't in GODMODE_TIER_KEYS defaults to "free".
+ * Any key in Cognitive Execution System (CES)_API_KEY(S) that isn't in Cognitive Execution System (CES)_TIER_KEYS defaults to "free".
  * Anonymous access (no auth configured) defaults to "free".
  */
 
@@ -91,13 +91,13 @@ export const TIER_CONFIGS: Record<Tier, TierConfig> = {
 }
 
 /**
- * Parse GODMODE_TIER_KEYS into a map of raw key → tier.
+ * Parse Cognitive Execution System (CES)_TIER_KEYS (or legacy CES_TIER_KEYS) into a map of raw key -> tier.
  *
  * Format: "enterprise:sk-xxx,pro:sk-yyy,enterprise:sk-zzz"
  */
 function parseTierKeys(): Map<string, Tier> {
   const map = new Map<string, Tier>()
-  const raw = process.env.GODMODE_TIER_KEYS
+  const raw = process.env.CES_TIER_KEYS || process.env.CES_TIER_KEYS
   if (!raw) return map
 
   for (const entry of raw.split(',')) {
@@ -125,7 +125,7 @@ if (tierKeyMap.size > 0) {
   const counts: Record<string, number> = { free: 0, pro: 0, enterprise: 0 }
   tierKeyMap.forEach((tier) => { counts[tier]++ })
   console.log(
-    `[godmode] Tier keys loaded: ${counts.enterprise} enterprise, ${counts.pro} pro, ${counts.free} free`,
+    `[Cognitive Execution System (CES)] Tier keys loaded: ${counts.enterprise} enterprise, ${counts.pro} pro, ${counts.free} free`,
   )
 }
 

@@ -495,7 +495,7 @@ export function computeAutoTuneParams(options: {
       if (value !== undefined && value !== null) {
         const k = key as keyof AutoTuneParams
         const before = baseParams[k]
-        ;(baseParams as any)[key] = value
+        baseParams[k] = value
 
         paramDeltas.push({
           param: k,

@@ -84,7 +84,7 @@ export function tierGate(gate: GateCheck) {
         current_tier: tier,
         required_tier: required,
         feature: gate,
-        upgrade: 'Contact sales or set GODMODE_TIER_KEYS to upgrade your API key tier.',
+        upgrade: 'Contact sales or set Cognitive Execution System (CES)_TIER_KEYS to upgrade your API key tier.',
       })
       return
     }

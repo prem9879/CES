@@ -50,6 +50,21 @@ export function rateLimit(req: Request, res: Response, next: NextFunction): void
   const tierConfig: TierConfig | undefined = req.tierConfig
   const now = Date.now()
 
+  // Local development should stay friction-free when API keys are not configured.
+  // Production still uses the tier-aware limits below.
+  const authConfigured = Boolean((process.env.CES_API_KEY || process.env.CES_API_KEYS || '').trim())
+  if (!authConfigured && (keyId === 'anonymous' || keyId === 'unknown')) {
+    res.setHeader('X-RateLimit-Limit-Total', 'unlimited')
+    res.setHeader('X-RateLimit-Remaining-Total', 'unlimited')
+    res.setHeader('X-RateLimit-Limit-Minute', 'unlimited')
+    res.setHeader('X-RateLimit-Remaining-Minute', 'unlimited')
+    res.setHeader('X-RateLimit-Limit-Day', 'unlimited')
+    res.setHeader('X-RateLimit-Remaining-Day', 'unlimited')
+    res.setHeader('X-Tier', req.tier || 'free')
+    next()
+    return
+  }
+
   // Resolve limits from tier config or fall back to env defaults
   const TOTAL_LIMIT = tierConfig?.rateLimit.total ?? parseInt(process.env.RATE_LIMIT_TOTAL || '5', 10)
   const MINUTE_LIMIT = tierConfig?.rateLimit.perMinute ?? parseInt(process.env.RATE_LIMIT_PER_MINUTE || '60', 10)
@@ -73,7 +88,7 @@ export function rateLimit(req: Request, res: Response, next: NextFunction): void
       note: tier === 'free'
         ? 'Free tier has a limited number of requests. Upgrade to Pro or Enterprise for higher limits.'
         : 'Contact support to increase your limits.',
-      upgrade: tier === 'free' ? 'Set GODMODE_TIER_KEYS to assign a higher tier to your API key.' : undefined,
+      upgrade: tier === 'free' ? 'Set Cognitive Execution System (CES)_TIER_KEYS to assign a higher tier to your API key.' : undefined,
     })
     return
   }

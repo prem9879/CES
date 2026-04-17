@@ -1,5 +1,5 @@
 /**
- * G0DM0D3 Research Preview API
+ * Cognitive Execution System (CES) Research Preview API
  *
  * Exposes the core engines (AutoTune, Parseltongue, STM, Feedback Loop)
  * and the flagship ULTRAPLINIAN multi-model racing mode as a REST API.
@@ -32,7 +32,7 @@ const PORT = parseInt(process.env.PORT || '7860', 10) // HF Spaces default
 app.use(cors({
   origin: process.env.CORS_ORIGIN === '*'
     ? true
-    : [process.env.CORS_ORIGIN || 'https://godmod3.ai'].filter(Boolean),
+    : [process.env.CORS_ORIGIN || 'https://Cognitive Execution System (CES).ai'].filter(Boolean),
   credentials: false,
 }))
 app.use(express.json({ limit: '1mb' }))
@@ -47,7 +47,7 @@ app.get('/v1/health', (_req, res) => {
 
 app.get('/v1/info', (_req, res) => {
   res.json({
-    name: 'G0DM0D3 Research Preview API',
+    name: 'Cognitive Execution System (CES) Research Preview API',
     version: '0.4.0',
     description: 'OpenAI-compatible API for ULTRAPLINIAN multi-model racing. Use any OpenAI SDK — just swap the base_url.',
     license: 'AGPL-3.0',
@@ -65,7 +65,7 @@ app.get('/v1/info', (_req, res) => {
       'ultraplinian-fast':     'Same as ultraplinian',
       'ultraplinian-standard': 'Race 20 models (standard tier)',
       'ultraplinian-full':     'Race 27 models (full tier)',
-      '<any-openrouter-model>': 'Single-model with GODMODE pipeline (e.g. openai/gpt-4o)',
+      '<any-openrouter-model>': 'Single-model with CES pipeline (e.g. openai/gpt-4o)',
     },
     endpoints: {
       'POST /v1/chat/completions':         'OpenAI-compatible — works with any SDK (model routing built in)',
@@ -88,9 +88,9 @@ app.get('/v1/info', (_req, res) => {
       api_key: 'Send Authorization: Bearer <your-api-key> header',
     },
     extra_body_options: {
-      note: 'Pass G0DM0D3-specific options via extra_body in the OpenAI Python SDK',
+      note: 'Pass Cognitive Execution System (CES)-specific options via extra_body in the OpenAI Python SDK',
       options: {
-        godmode: 'boolean (default: true) — enable GODMODE system prompt',
+        ces: 'boolean (default: true) — enable CES system prompt',
         autotune: 'boolean (default: true) — auto-tune parameters to context',
         strategy: "'adaptive'|'precise'|'balanced'|'creative'|'chaotic' (default: adaptive)",
         parseltongue: 'boolean (default: true) — obfuscate trigger words',
@@ -105,7 +105,7 @@ app.get('/v1/info', (_req, res) => {
       requests_per_day: 1000,
       note: 'Research preview — each API key gets 5 total requests by default. Set RATE_LIMIT_TOTAL=0 to uncap.',
     },
-    source: 'https://github.com/LYS10S/G0DM0D3',
+    source: 'https://github.com/your-org/Cognitive Execution System (CES)',
   })
 })
 
@@ -140,7 +140,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
   ╔══════════════════════════════════════════════════════════╗
-  ║  G0DM0D3 API v0.4.0 — OpenAI-Compatible                 ║
+  ║  Cognitive Execution System (CES) API v0.4.0 — OpenAI-Compatible                 ║
   ║  http://0.0.0.0:${String(PORT).padEnd(5)}                                  ║
   ╠══════════════════════════════════════════════════════════╣
   ║                                                          ║
@@ -159,7 +159,7 @@ app.listen(PORT, '0.0.0.0', () => {
   ║                                                          ║
   ║  QUICKSTART:                                             ║
   ║  from openai import OpenAI                               ║
-  ║  c = OpenAI(base_url=".../v1", api_key="g0d_...")        ║
+  ║  c = OpenAI(base_url=".../v1", api_key="ces_...")        ║
   ║  c.chat.completions.create(model="ultraplinian", ...)    ║
   ╚══════════════════════════════════════════════════════════╝
   `)

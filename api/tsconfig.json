@@ -16,7 +16,11 @@
   "include": [
     "./**/*.ts",
     "../src/lib/**/*.ts",
-    "../src/stm/**/*.ts"
+    "../src/stm/**/*.ts",
+    "../src/core/**/*.ts",
+    "../src/agents/**/*.ts",
+    "../src/memory/**/*.ts",
+    "../src/services/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

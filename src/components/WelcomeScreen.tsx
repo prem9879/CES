@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useStore } from '@/store'
 import { Key, Terminal } from 'lucide-react'
 
@@ -125,6 +126,13 @@ export function WelcomeScreen({ onOpenSettings }: WelcomeScreenProps) {
         <span className="cursor-help" title="There are secrets hidden here...">
           v0.1.0-alpha | 🜏
         </span>
+      </div>
+
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs opacity-80 flex gap-3 flex-wrap justify-center">
+        <Link href="/auth/" className="underline">Auth</Link>
+        <Link href="/billing/" className="underline">Billing</Link>
+        <Link href="/privacy-policy/" className="underline">Privacy</Link>
+        <Link href="/terms/" className="underline">Terms</Link>
       </div>
 
       {/* Hidden ASCII skull - Easter egg */}

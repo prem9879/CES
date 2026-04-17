@@ -22,19 +22,19 @@ datasetRoutes.get('/export', (req, res) => {
   if (format === 'jsonl') {
     // JSONL format — one JSON object per line, ideal for HF Datasets
     res.setHeader('Content-Type', 'application/x-ndjson')
-    res.setHeader('Content-Disposition', 'attachment; filename="g0dm0d3-dataset.jsonl"')
+    res.setHeader('Content-Disposition', 'attachment; filename="novaos-dataset.jsonl"')
     const lines = dataset.map(entry => JSON.stringify(entry))
     res.send(lines.join('\n') + '\n')
   } else {
     // Standard JSON array
     res.setHeader('Content-Type', 'application/json')
-    res.setHeader('Content-Disposition', 'attachment; filename="g0dm0d3-dataset.json"')
+    res.setHeader('Content-Disposition', 'attachment; filename="novaos-dataset.json"')
     res.json({
       metadata: {
-        name: 'G0DM0D3 Research Dataset',
+        name: 'NOVAOS Research Dataset',
         description: 'Opt-in collection of LLM interactions with AutoTune, Parseltongue, and ULTRAPLINIAN pipeline metadata.',
         license: 'AGPL-3.0',
-        source: 'https://github.com/LYS10S/G0DM0D3',
+        source: 'https://github.com/your-org/NOVAOS',
         exported_at: new Date().toISOString(),
         total_entries: dataset.length,
       },

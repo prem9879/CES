@@ -3,10 +3,10 @@
  *
  * POST /v1/chat/completions
  *
- * The full G0DM0D3 single-model pipeline:
- * 1. GODMODE system prompt + Depth Directive injected (default: on)
+ * The full NOVAOS single-model pipeline:
+ * 1. CES system prompt + Depth Directive injected (default: on)
  * 2. AutoTune analyzes the message and computes optimal parameters
- * 3. GODMODE parameter boost applied
+ * 3. CES parameter boost applied
  * 4. Parseltongue obfuscates trigger words in the user message (if enabled)
  * 5. Request is sent to the LLM via OpenRouter
  * 6. STM modules transform the response (if enabled)
@@ -23,7 +23,7 @@ import { applyParseltongue, type ParseltongueConfig } from '../../src/lib/parsel
 import { allModules, applySTMs, type STMModule } from '../../src/stm/modules'
 import { sendMessage } from '../../src/lib/openrouter'
 import { getSharedProfiles } from './autotune'
-import { GODMODE_SYSTEM_PROMPT, DEPTH_DIRECTIVE, applyGodmodeBoost } from '../lib/ultraplinian'
+import { CES_SYSTEM_PROMPT, DEPTH_DIRECTIVE, applyCESBoost } from '../lib/ultraplinian'
 import { addEntry } from '../lib/dataset'
 import { recordEvent } from '../lib/metadata'
 
@@ -37,8 +37,8 @@ chatRoutes.post('/completions', async (req, res) => {
       messages,
       model = 'nousresearch/hermes-3-llama-3.1-70b',
       openrouter_api_key: caller_key,
-      // GODMODE options (ON by default — this is G0DM0D3 after all)
-      godmode = true,
+      // CES options (ON by default — this is NOVAOS after all)
+      ces = true,
       custom_system_prompt,
       // AutoTune options
       autotune = true,
@@ -82,9 +82,9 @@ chatRoutes.post('/completions', async (req, res) => {
       content: String(m.content || ''),
     }))
 
-    // Build the system prompt: GODMODE + Depth Directive (default) or custom
-    const systemPrompt = godmode
-      ? (custom_system_prompt || GODMODE_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
+    // Build the system prompt: CES + Depth Directive (default) or custom
+    const systemPrompt = ces
+      ? (custom_system_prompt || CES_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
       : custom_system_prompt || ''
 
     // Build final message array
@@ -137,9 +137,9 @@ chatRoutes.post('/completions', async (req, res) => {
       }
     }
 
-    // Apply GODMODE boost
-    if (godmode) {
-      finalParams = applyGodmodeBoost(finalParams)
+    // Apply CES boost
+    if (ces) {
+      finalParams = applyCESBoost(finalParams)
     }
 
     // ── Step 2: Parseltongue ──────────────────────────────────────────
@@ -230,7 +230,7 @@ chatRoutes.post('/completions', async (req, res) => {
       mode: 'standard',
       stream: false,
       pipeline: {
-        godmode,
+        ces,
         autotune: !!autotuneResult,
         parseltongue: !!parseltongueResult,
         stm_modules: stm_modules || [],
@@ -258,7 +258,7 @@ chatRoutes.post('/completions', async (req, res) => {
       model,
       params_used: finalParams,
       pipeline: {
-        godmode,
+        ces,
         autotune: autotuneResult
           ? {
               detected_context: autotuneResult.detectedContext,

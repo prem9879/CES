@@ -1,16 +1,34 @@
 import type { Metadata } from 'next'
+import { JetBrains_Mono } from 'next/font/google'
 import { Providers } from '@/components/Providers'
 import './globals.css'
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com'
+const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'], display: 'swap' })
+
 export const metadata: Metadata = {
-  title: 'G0DM0DƎ | Liberated AI Chat',
-  description: 'Open-source, privacy-respecting, multi-model chat interface for hackers and philosophers',
-  keywords: ['AI', 'chat', 'open-source', 'privacy', 'hacker', 'Claude', 'GPT', 'OpenRouter'],
+  title: 'CES',
+  description: 'Structured execution workspace for chat, build, debug, research, and decision workflows.',
+  keywords: ['CES', 'AI workspace', 'build mode', 'decision engine'],
   authors: [{ name: 'Lysios Lab' }],
+  metadataBase: new URL(siteUrl),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
-    title: 'G0DM0DƎ',
-    description: 'Cognition without control. Tools for builders, not gatekeepers.',
+    title: 'CES',
+    description: 'Intent routing, structured outputs, build generation, and execution workflows.',
     type: 'website',
+    url: siteUrl,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'CES',
+    description: 'Intent routing, structured outputs, build generation, and execution workflows.',
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 }
 
@@ -21,15 +39,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Share+Tech+Mono&family=VT323&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="font-mono antialiased">
+      <body className={`${jetBrainsMono.className} font-mono antialiased`}>
         <Providers>
           {children}
         </Providers>

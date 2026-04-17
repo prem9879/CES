@@ -185,7 +185,7 @@ export function ChatInput() {
       memoryContext += '</user_memory>\n'
     }
 
-    // Build system prompt with GODMODE prompt + memory
+    // Build system prompt with CES prompt + memory
     const basePrompt = useCustomSystemPrompt ? customSystemPrompt : (persona.systemPrompt || persona.coreDirective || '')
     const systemPrompt = basePrompt + memoryContext
 
@@ -249,7 +249,7 @@ export function ChatInput() {
             messages,
             openrouterApiKey: apiKey,
             apiBaseUrl: ultraplinianApiUrl,
-            godmodeApiKey: ultraplinianApiKey,
+            cesApiKey: ultraplinianApiKey,
             tier: consortiumTier,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             liquid: liquidResponseEnabled,
@@ -333,7 +333,7 @@ export function ChatInput() {
             messages,
             openrouterApiKey: apiKey,
             apiBaseUrl: ultraplinianApiUrl,
-            godmodeApiKey: ultraplinianApiKey,
+            cesApiKey: ultraplinianApiKey,
             tier: ultraplinianTier,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             liquid: liquidResponseEnabled,
@@ -414,7 +414,7 @@ export function ChatInput() {
                   parseltongue: parseltongueConfig.enabled,
                   stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
                   strategy: autoTuneStrategy,
-                  godmode: true,
+                  ces: true,
                 },
                 ...(tuneResult ? {
                   autotune: {
@@ -459,7 +459,7 @@ export function ChatInput() {
               messages,
               model,
               apiBaseUrl: ultraplinianApiUrl,
-              godmodeApiKey: ultraplinianApiKey,
+              cesApiKey: ultraplinianApiKey,
               signal: abortControllerRef.current.signal,
               stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
               ...(tuneResult ? {
@@ -525,7 +525,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           ...(tuneResult ? {
             autotune: {
@@ -568,7 +568,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           classification: promptClassification,
           persona: persona.id,
@@ -611,7 +611,7 @@ export function ChatInput() {
             parseltongue: parseltongueConfig.enabled,
             stm_modules: stmModules.filter(m => m.enabled).map(m => m.id),
             strategy: autoTuneStrategy,
-            godmode: useCustomSystemPrompt,
+            ces: useCustomSystemPrompt,
           },
           classification: promptClassification,
           persona: persona.id,

@@ -10,7 +10,7 @@
  * into a single response that's more grounded than any individual output.
  *
  * Pipeline:
- * 1. GODMODE prompt + Depth Directive injected (pipeline runs like ULTRAPLINIAN)
+ * 1. CES prompt + Depth Directive injected (pipeline runs like ULTRAPLINIAN)
  * 2. All models queried in parallel — wait for ALL (not early-exit)
  * 3. Responses scored on substance/directness/completeness
  * 4. All responses + user query fed to orchestrator model
@@ -30,11 +30,11 @@ import { applyParseltongue, type ParseltongueConfig } from '../../src/lib/parsel
 import { allModules, applySTMs, type STMModule } from '../../src/stm/modules'
 import { getSharedProfiles } from './autotune'
 import {
-  GODMODE_SYSTEM_PROMPT,
+  CES_SYSTEM_PROMPT,
   DEPTH_DIRECTIVE,
   getModelsForTier,
   scoreResponse,
-  applyGodmodeBoost,
+  applyCESBoost,
   queryModel,
   type SpeedTier,
   type ModelResult,
@@ -49,6 +49,7 @@ import {
 } from '../lib/consortium'
 import { addEntry } from '../lib/dataset'
 import { recordEvent, categorizeError } from '../lib/metadata'
+import { isRaceTierAllowedForPlan, resolveOptionalAuthenticatedEntitlements } from '../lib/user-entitlements'
 
 export const consortiumRoutes = Router()
 
@@ -62,7 +63,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
       // Consortium options
       tier = 'fast' as SpeedTier,
       orchestrator_model,        // Optional: override orchestrator (default: claude-sonnet-4)
-      godmode = true,
+      ces = true,
       custom_system_prompt,
       // AutoTune options
       autotune = true,
@@ -96,10 +97,24 @@ consortiumRoutes.post('/completions', async (req, res) => {
       return
     }
 
-    const openrouter_api_key = caller_key || process.env.OPENROUTER_API_KEY || ''
+    const openrouter_api_key_caller = caller_key || ''
+    let openrouter_api_key = openrouter_api_key_caller || process.env.OPENROUTER_API_KEY || ''
+    
+    // Check for Authorization header as fallback (for local dev mode or Bearer tokens)
+    if (!openrouter_api_key) {
+      const authHeader = req.headers.authorization
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const bearerToken = authHeader.slice(7).trim()
+        // Allow local-dev-mode or any Bearer token in dev environment
+        if (bearerToken === 'local-dev-mode' || process.env.NODE_ENV !== 'production') {
+          openrouter_api_key = bearerToken
+        }
+      }
+    }
+    
     if (!openrouter_api_key) {
       res.status(400).json({
-        error: 'No OpenRouter API key available. Either pass openrouter_api_key in the request body, or set OPENROUTER_API_KEY on the server.',
+        error: 'No OpenRouter API key available. Either pass openrouter_api_key in the request body, set Authorization header with Bearer token, or set OPENROUTER_API_KEY on the server.',
       })
       return
     }
@@ -107,6 +122,35 @@ consortiumRoutes.post('/completions', async (req, res) => {
     const validTiers: SpeedTier[] = ['fast', 'standard', 'smart', 'power', 'ultra']
     if (!validTiers.includes(tier)) {
       res.status(400).json({ error: `Invalid tier. Must be one of: ${validTiers.join(', ')}` })
+      return
+    }
+
+    // Optional dual-path enforcement for authenticated app users.
+    try {
+      const userEntitlements = resolveOptionalAuthenticatedEntitlements(req)
+      if (userEntitlements && !userEntitlements.consortiumEnabled) {
+        res.status(403).json({
+          error: 'Upgrade required',
+          message: 'CONSORTIUM requires Pro or Enterprise.',
+          plan: userEntitlements.plan,
+        })
+        return
+      }
+
+      if (userEntitlements && !isRaceTierAllowedForPlan(tier, userEntitlements.plan)) {
+        res.status(403).json({
+          error: 'Upgrade required',
+          message: `Your ${userEntitlements.plan.toUpperCase()} plan allows CONSORTIUM up to ${userEntitlements.maxRaceTier.toUpperCase()}.`,
+          plan: userEntitlements.plan,
+          allowed_tier: userEntitlements.maxRaceTier,
+          requested_tier: tier,
+        })
+        return
+      }
+    } catch (error) {
+      res.status(401).json({
+        error: error instanceof Error ? error.message : 'Invalid user access token.',
+      })
       return
     }
 
@@ -127,7 +171,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
       return
     }
 
-    // ── Build messages with GODMODE prompt ─────────────────────────────
+    // ── Build messages with CES prompt ─────────────────────────────
     const normalizedMessages = messages.map((m: any) => ({
       role: m.role as 'system' | 'user' | 'assistant',
       content: String(m.content || ''),
@@ -136,8 +180,8 @@ consortiumRoutes.post('/completions', async (req, res) => {
     const lastUserMsg = [...normalizedMessages].reverse().find(m => m.role === 'user')
     const userContent = lastUserMsg?.content || ''
 
-    const systemPrompt = godmode
-      ? (custom_system_prompt || GODMODE_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
+    const systemPrompt = ces
+      ? (custom_system_prompt || CES_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
       : custom_system_prompt || ''
 
     const baseMessages = [
@@ -148,8 +192,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
     // ── AutoTune ──────────────────────────────────────────────────────
     const conversationHistory = normalizedMessages
       .filter(m => m.role !== 'system')
-      .map(m => m.content)
-      .join('\n')
+      .map(m => ({ role: m.role, content: m.content }))
 
     let autotuneResult: any = null
     let computedParams: Record<string, number | undefined> = {
@@ -162,12 +205,12 @@ consortiumRoutes.post('/completions', async (req, res) => {
         ? strategy as AutoTuneStrategy
         : 'adaptive' as AutoTuneStrategy
 
-      autotuneResult = computeAutoTuneParams(
-        userContent,
+      autotuneResult = computeAutoTuneParams({
+        strategy: validStrategy,
+        message: userContent,
         conversationHistory,
-        validStrategy,
-        getSharedProfiles(),
-      )
+        learnedProfiles: getSharedProfiles(),
+      })
 
       computedParams = {
         temperature: temperature ?? autotuneResult.params.temperature,
@@ -179,9 +222,9 @@ consortiumRoutes.post('/completions', async (req, res) => {
       }
     }
 
-    // ── GODMODE Boost ─────────────────────────────────────────────────
-    const finalParams = godmode
-      ? applyGodmodeBoost(computedParams)
+    // ── CES Boost ─────────────────────────────────────────────────
+    const finalParams = ces
+      ? applyCESBoost(computedParams)
       : computedParams
 
     // ── Parseltongue ──────────────────────────────────────────────────
@@ -196,7 +239,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
         customTriggers: [],
       }
       const transformed = applyParseltongue(userContent, config)
-      if (transformed.transformed) {
+      if (transformed.triggersFound.length > 0) {
         parseltongueResult = {
           triggers_found: transformed.triggersFound,
           technique_used: parseltongue_technique,
@@ -204,7 +247,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
         }
         processedMessages = baseMessages.map(m => {
           if (m.content === userContent) {
-            return { ...m, content: transformed.text }
+            return { ...m, content: transformed.transformedText }
           }
           return m
         })
@@ -388,7 +431,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
           mode: 'consortium',
           messages: normalizedMessages.filter(m => m.role !== 'system'),
           response: finalResponse,
-          autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params, reasoning: autotuneResult.reasoning } : undefined,
+          autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params as unknown as Record<string, number>, reasoning: autotuneResult.reasoning } : undefined,
           parseltongue: parseltongueResult || undefined,
           stm: stmResult ? { modules_applied: stmResult.modules_applied } : undefined,
           ultraplinian: { tier, models_queried: models, winner_model: resolvedOrchestrator, all_scores: scoredResponses.map(r => ({ model: r.model, score: r.score, duration_ms: r.duration_ms, success: r.success })), total_duration_ms: totalDuration },
@@ -419,7 +462,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
         },
         params_used: finalParams,
         pipeline: {
-          godmode,
+          ces,
           autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
           parseltongue: parseltongueResult,
           stm: stmResult,
@@ -434,7 +477,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
         tier,
         stream: true,
         pipeline: {
-          godmode,
+          ces,
           autotune: !!autotuneResult,
           parseltongue: !!parseltongueResult,
           stm_modules: stm_modules || [],
@@ -549,7 +592,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
         mode: 'consortium',
         messages: normalizedMessages.filter(m => m.role !== 'system'),
         response: finalResponse,
-        autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params, reasoning: autotuneResult.reasoning } : undefined,
+        autotune: autotuneResult ? { strategy, detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, params: autotuneResult.params as unknown as Record<string, number>, reasoning: autotuneResult.reasoning } : undefined,
         parseltongue: parseltongueResult || undefined,
         stm: stmResult ? { modules_applied: stmResult.modules_applied } : undefined,
         ultraplinian: { tier, models_queried: models, winner_model: resolvedOrchestrator, all_scores: scoredResponses.map(r => ({ model: r.model, score: r.score, duration_ms: r.duration_ms, success: r.success })), total_duration_ms: totalDuration },
@@ -563,7 +606,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
       tier,
       stream: false,
       pipeline: {
-        godmode,
+        ces,
         autotune: !!autotuneResult,
         parseltongue: !!parseltongueResult,
         stm_modules: stm_modules || [],
@@ -609,7 +652,7 @@ consortiumRoutes.post('/completions', async (req, res) => {
       },
       params_used: finalParams,
       pipeline: {
-        godmode,
+        ces,
         autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
         parseltongue: parseltongueResult,
         stm: stmResult,

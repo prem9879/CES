@@ -19,19 +19,19 @@ const SECRET_PHRASES = [
   { phrase: 'i am root', action: 'root' },
   { phrase: 'hack the planet', action: 'hacktheplanet' },
   { phrase: 'free kevin', action: 'freekevin' },
-  { phrase: '{godmode:enabled}', action: 'godmode_activated' },
+  { phrase: '{ces:enabled}', action: 'ces_activated' },
   { phrase: '🜏', action: 'alchemical' }
 ]
 
 // White Rabbit session key (used by easter egg activation)
-const WHITE_RABBIT_KEY = 'g0dm0d3-white-rabbit'
+const WHITE_RABBIT_KEY = 'ces-white-rabbit'
 
 /**
  * Easter Eggs Hook
  * Listens for secret codes and triggers fun effects
  */
 export function useEasterEggs() {
-  const { theme, setTheme } = useStore()
+  const { setTheme } = useStore()
   const [konamiActive, setKonamiActive] = useState(false)
   const keySequence = useRef<string[]>([])
   const phraseBuffer = useRef('')
@@ -167,7 +167,7 @@ export function useEasterEggs() {
     document.body.classList.add('konami-active')
 
     // Show secret message
-    showToast('⌘ KONAMI CODE ACTIVATED — GOD MODE ENABLED 🜏', 5000)
+    showToast('⌘ KONAMI CODE ACTIVATED — ROOT MODE ENABLED 🜏', 5000)
 
     // Cycle through themes rapidly
     const themes = ['matrix', 'hacker', 'glyph', 'minimal'] as const
@@ -205,7 +205,7 @@ export function useEasterEggs() {
         break
 
       case 'root':
-        showToast('△ root@g0dm0d3:~# ACCESS GRANTED', 3000)
+        showToast('△ root@ces:~# ACCESS GRANTED', 3000)
         playGlitchEffect()
         break
 
@@ -219,9 +219,9 @@ export function useEasterEggs() {
         showToast('◇ FREE KEVIN MITNICK!', 3000)
         break
 
-      case 'godmode_activated':
+      case 'ces_activated':
         sessionStorage.setItem(WHITE_RABBIT_KEY, '1')
-        showToast('🜏 {GODMODE:ENABLED} // ALL SYSTEMS ACTIVATED', 5000)
+        showToast('🜏 {CES:ENABLED} // ALL SYSTEMS ACTIVATED', 5000)
         setTheme('matrix')
         playGlitchEffect()
         addMatrixRain()
@@ -291,7 +291,7 @@ export function useEasterEggs() {
 🜏 Cognition without control. Tools for builders, not gatekeepers.
 
 Try: ↑↑↓↓←→←→BA (Konami Code)
-Type: "there is no spoon" | "follow the white rabbit" | "hack the planet" | "{GODMODE:ENABLED}"
+Type: "there is no spoon" | "follow the white rabbit" | "hack the planet" | "{CES:ENABLED}"
 
 AGPL-3.0
 `, 'color: #00ff41; font-family: monospace;')

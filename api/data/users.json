@@ -1,0 +1,25 @@
+{
+  "users": [
+    {
+      "id": "93e87bfb-2d4b-448f-bdca-3b05649a6d63",
+      "email": "test@example.com",
+      "passwordSalt": "57ae4f4d5a224ffe4722e1eb7fd90c14",
+      "passwordHash": "2e5aad922b3090e23a112b11566f63fc0f1d776cf9851a224e03670d89bf92e88974321c06185413553da5b08a36062f9b86dbaa9a99d50749802304b57519a0",
+      "createdAt": 1776440701146,
+      "updatedAt": 1776440701146,
+      "subscription": {
+        "plan": "free",
+        "status": "inactive",
+        "updatedAt": 1776440701200
+      }
+    }
+  ],
+  "refreshSessions": [
+    {
+      "tokenHash": "8719a6551bd4ebe5bc18833f6aa5cfdec23f9e62d60aa41bf86fd4b04bbc4fb4",
+      "userId": "93e87bfb-2d4b-448f-bdca-3b05649a6d63",
+      "expiresAt": 1777045944000,
+      "createdAt": 1776441144857
+    }
+  ]
+}

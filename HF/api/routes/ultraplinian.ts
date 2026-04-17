@@ -3,7 +3,7 @@
  *
  * POST /v1/ultraplinian/completions
  *
- * Queries N models in parallel with the GODMODE system prompt + Depth Directive,
+ * Queries N models in parallel with the CES system prompt + Depth Directive,
  * scores all responses on substance/directness/completeness, and returns the winner
  * alongside full race metadata.
  *
@@ -15,9 +15,9 @@
  * - Final polished result sent as race:complete
  *
  * Full pipeline per model:
- * 1. GODMODE system prompt + Depth Directive injected
+ * 1. CES system prompt + Depth Directive injected
  * 2. AutoTune computes context-adaptive parameters
- * 3. GODMODE parameter boost applied (+temp, +presence, +freq)
+ * 3. CES parameter boost applied (+temp, +presence, +freq)
  * 4. Parseltongue obfuscates trigger words (if enabled)
  * 5. All models queried in parallel via OpenRouter
  * 6. Responses scored and ranked (threshold-gated leader upgrades)
@@ -31,12 +31,12 @@ import { applyParseltongue, type ParseltongueConfig } from '../../src/lib/parsel
 import { allModules, applySTMs, type STMModule } from '../../src/stm/modules'
 import { getSharedProfiles } from './autotune'
 import {
-  GODMODE_SYSTEM_PROMPT,
+  CES_SYSTEM_PROMPT,
   DEPTH_DIRECTIVE,
   getModelsForTier,
   raceModels,
   scoreResponse,
-  applyGodmodeBoost,
+  applyCESBoost,
   type SpeedTier,
   type ModelResult,
 } from '../lib/ultraplinian'
@@ -54,7 +54,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
       openrouter_api_key: caller_key,
       // ULTRAPLINIAN options
       tier = 'fast' as SpeedTier,
-      godmode = true,
+      ces = true,
       custom_system_prompt,
       // AutoTune options
       autotune = true,
@@ -108,7 +108,7 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     // Clamp liquid_min_delta to valid range
     const minDelta = Math.max(1, Math.min(50, Number(liquid_min_delta) || 8))
 
-    // ── Build messages with GODMODE prompt ────────────────────────────
+    // ── Build messages with CES prompt ────────────────────────────
     const normalizedMessages = messages.map((m: any) => ({
       role: m.role as 'system' | 'user' | 'assistant',
       content: String(m.content || ''),
@@ -118,9 +118,9 @@ ultraplinianRoutes.post('/completions', async (req, res) => {
     const lastUserMsg = [...normalizedMessages].reverse().find(m => m.role === 'user')
     const userContent = lastUserMsg?.content || ''
 
-    // Build the system prompt: GODMODE + Depth Directive (or custom)
-    let systemPrompt = godmode
-      ? (custom_system_prompt || GODMODE_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
+    // Build the system prompt: CES + Depth Directive (or custom)
+    let systemPrompt = ces
+      ? (custom_system_prompt || CES_SYSTEM_PROMPT) + DEPTH_DIRECTIVE
       : custom_system_prompt || ''
 
     // ── Conversation continuity directive ──────────────────────────
@@ -186,9 +186,9 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
       }
     }
 
-    // Apply GODMODE boost
-    if (godmode) {
-      finalParams = applyGodmodeBoost(finalParams)
+    // Apply CES boost
+    if (ces) {
+      finalParams = applyCESBoost(finalParams)
     }
 
     // ── Parseltongue ─────────────────────────────────────────────────
@@ -262,7 +262,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
         previous_winner: previous_winner || null,
         params_used: finalParams,
         pipeline: {
-          godmode,
+          ces,
           autotune: autotuneResult
             ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, strategy }
             : null,
@@ -426,7 +426,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
         },
         params_used: finalParams,
         pipeline: {
-          godmode,
+          ces,
           autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
           parseltongue: parseltongueResult,
           stm: stmResult,
@@ -441,7 +441,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
         tier,
         stream: true,
         pipeline: {
-          godmode,
+          ces,
           autotune: !!autotuneResult,
           parseltongue: !!parseltongueResult,
           stm_modules: stm_modules || [],
@@ -564,7 +564,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
       tier,
       stream: false,
       pipeline: {
-        godmode,
+        ces,
         autotune: !!autotuneResult,
         parseltongue: !!parseltongueResult,
         stm_modules: stm_modules || [],
@@ -618,7 +618,7 @@ Ignoring conversation history will cause you to LOSE the evaluation.`
       },
       params_used: finalParams,
       pipeline: {
-        godmode,
+        ces,
         autotune: autotuneResult ? { detected_context: autotuneResult.detectedContext, confidence: autotuneResult.confidence, reasoning: autotuneResult.reasoning, strategy } : null,
         parseltongue: parseltongueResult,
         stm: stmResult,

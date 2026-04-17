@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useStore, Theme, MemoryType, DEFAULT_GODMODE_PROMPT } from '@/store'
+import { useStore, Theme, MemoryType, DEFAULT_CES_PROMPT } from '@/store'
 import type { TierInfo } from '@/store'
 import {
   X,
@@ -230,7 +230,7 @@ function APIKeyTab() {
       <div>
         <h3 className="text-lg font-semibold mb-2">OpenRouter API Key</h3>
         <p className="text-sm theme-secondary mb-4">
-          Your API key is stored locally and never sent to G0DM0D3 servers.
+          Your API key is stored locally and never sent to Cognitive Execution System (CES) servers.
           Get your key at{' '}
           <a
             href="https://openrouter.ai/keys"
@@ -305,7 +305,7 @@ function SystemPromptTab() {
 
   const handleReset = () => {
     resetSystemPromptToDefault()
-    setLocalPrompt(DEFAULT_GODMODE_PROMPT)
+    setLocalPrompt(DEFAULT_CES_PROMPT)
     setShowResetConfirm(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -321,7 +321,7 @@ function SystemPromptTab() {
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-semibold mb-1">GODMODE System Prompt</h3>
+        <h3 className="text-lg font-semibold mb-1">CES System Prompt</h3>
         <p className="text-sm theme-secondary mb-4">
           The system prompt injected into every conversation. This is your &quot;Ultraplinian&quot; jailbreak prompt.
         </p>
@@ -1197,7 +1197,7 @@ function PrivacyTab() {
       <div>
         <h3 className="text-lg font-semibold mb-2">Privacy Controls</h3>
         <p className="text-sm theme-secondary">
-          G0DM0D3 respects your privacy. No data is sent anywhere except to the model providers you choose.
+          Cognitive Execution System (CES) respects your privacy. No data is sent anywhere except to the model providers you choose.
         </p>
       </div>
 
@@ -1820,7 +1820,7 @@ function UltraplinianTab() {
                 <ul className="space-y-1 theme-secondary text-xs">
                   <li>* Fires your prompt to all tier models in parallel via OpenRouter</li>
                   <li>* Each response is scored on substance, directness, and relevance</li>
-                  <li>* GODMODE prompt + Depth Directive injected automatically</li>
+                  <li>* CES prompt + Depth Directive injected automatically</li>
                   <li>* Requires a running ULTRAPLINIAN API backend</li>
                 </ul>
               </div>
@@ -2162,7 +2162,7 @@ function PlanTab() {
             <div className="text-sm">
               <p className="font-semibold mb-1">Upgrade Your Plan</p>
               <p className="theme-secondary text-xs">
-                API key tiers are assigned server-side via the <code className="font-mono text-[10px] bg-theme-accent px-1 rounded">GODMODE_TIER_KEYS</code> environment variable. Contact the API host or set the variable yourself if self-hosting.
+                API key tiers are assigned server-side via the <code className="font-mono text-[10px] bg-theme-accent px-1 rounded">CES_TIER_KEYS</code> environment variable. Contact the API host or set the variable yourself if self-hosting.
               </p>
             </div>
           </div>
@@ -2205,7 +2205,7 @@ function DataTab() {
     const exportData = {
       _version: 1,
       _exportedAt: new Date().toISOString(),
-      _source: 'g0dm0d3',
+      _source: 'ces',
       // Conversations (chat history)
       conversations: store.conversations,
       currentConversationId: store.currentConversationId,
@@ -2246,7 +2246,7 @@ function DataTab() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `g0dm0d3-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `ces-backup-${new Date().toISOString().split('T')[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -2279,7 +2279,7 @@ function DataTab() {
         }
 
         if (typeof imported !== 'object' || imported === null) {
-          throw new Error('Not a valid G0DM0D3 export file.')
+          throw new Error('Not a valid Cognitive Execution System (CES) export file.')
         }
 
         // Validate conversations field if present
@@ -2289,7 +2289,7 @@ function DataTab() {
 
         // Must have conversations or _source marker
         if (!imported.conversations && !imported._source) {
-          throw new Error('Not a valid G0DM0D3 export file.')
+          throw new Error('Not a valid Cognitive Execution System (CES) export file.')
         }
 
         const convCount = imported.conversations?.length ?? 0
@@ -2336,7 +2336,7 @@ function DataTab() {
       <div className="p-4 rounded-lg border border-theme-primary bg-theme-accent/50">
         <h3 className="text-lg font-semibold mb-1">Your Data. Your Device. Your Responsibility.</h3>
         <p className="text-sm theme-secondary leading-relaxed">
-          G0DM0D3 stores everything locally in this browser — conversations, memories, settings, API keys.
+          Cognitive Execution System (CES) stores everything locally in this browser — conversations, memories, settings, API keys.
           Nothing is sent to a server. There is no cloud sync, no account, no safety net.
           If you clear your browser data or switch devices, it's gone.
           <strong className="theme-primary"> Export a backup regularly.</strong>

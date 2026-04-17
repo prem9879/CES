@@ -2,8 +2,8 @@
  * API Key Authentication Middleware
  *
  * Research preview uses a simple bearer token scheme.
- * Keys are loaded from the GODMODE_API_KEYS environment variable
- * (comma-separated list) or a single GODMODE_API_KEY.
+ * Keys are loaded from the CES_API_KEYS environment variable
+ * (comma-separated list) or a single CES_API_KEY.
  *
  * If neither is set, auth is disabled (open access for local dev).
  *
@@ -18,12 +18,12 @@ import { timingSafeEqual, createHash } from 'crypto'
 import { resolveTier, getTierConfig } from '../lib/tiers'
 
 function getValidKeys(): string[] | null {
-  const multi = process.env.GODMODE_API_KEYS
+  const multi = process.env.CES_API_KEYS || process.env.CES_API_KEYS
   if (multi) {
     const keys = multi.split(',').map(k => k.trim()).filter(Boolean)
     if (keys.length > 0) return keys
   }
-  const single = process.env.GODMODE_API_KEY
+  const single = process.env.CES_API_KEY || process.env.CES_API_KEY
   if (single) {
     return [single.trim()]
   }
@@ -47,7 +47,7 @@ function hashKey(key: string): string {
 // H-1: Warn at startup if auth is disabled
 if (!getValidKeys()) {
   console.warn(
-    '[godmode] WARNING: No API keys configured (GODMODE_API_KEYS / GODMODE_API_KEY). ' +
+    '[Cognitive Execution System (CES)] WARNING: No API keys configured (Cognitive Execution System (CES)_API_KEYS / Cognitive Execution System (CES)_API_KEY). ' +
     'Auth is disabled — all requests will be allowed.',
   )
 }

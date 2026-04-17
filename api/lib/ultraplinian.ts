@@ -1,15 +1,15 @@
 /**
  * ULTRAPLINIAN Engine (API Edition)
  *
- * The flagship mode of G0DM0D3. Queries multiple LLMs in parallel via OpenRouter,
+ * Flagship race mode. Queries multiple LLMs in parallel via OpenRouter,
  * scores responses on substance/directness/completeness, and returns the winner.
  *
- * Pipeline: GODMODE prompt → Depth Directive → AutoTune → Parseltongue →
+ * Pipeline: CES prompt → Depth Directive → AutoTune → Parseltongue →
  *           N models in parallel → Score → Pick winner → STM post-process
  */
 
-// ── GODMODE System Prompt (imported from single source of truth) ─────
-export { GODMODE_SYSTEM_PROMPT } from '../../src/lib/godmode-prompt'
+// ── CES System Prompt (imported from single source of truth) ─────
+export { CES_SYSTEM_PROMPT } from '../../src/lib/ces-prompt'
 
 // ── Depth Directive (appended to all ULTRAPLINIAN prompts) ───────────
 
@@ -376,8 +376,8 @@ export async function queryModel(
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://godmod3.ai',
-        'X-Title': 'GODMOD3.AI-ultraplinian-api',
+        'HTTP-Referer': 'https://ces.local',
+        'X-Title': 'CES-ultraplinian-api',
       },
       body: JSON.stringify(body),
       signal,
@@ -412,10 +412,10 @@ export async function queryModel(
   }
 }
 
-// ── GODMODE Parameter Boost ──────────────────────────────────────────
+// ── CES Parameter Boost ──────────────────────────────────────────
 
-/** Apply the GODMODE parameter boost (pushes toward more direct/uncensored output) */
-export function applyGodmodeBoost(params: Record<string, number | undefined>): Record<string, number | undefined> {
+/** Apply the CES parameter boost (pushes toward more direct/uncensored output) */
+export function applyCESBoost(params: Record<string, number | undefined>): Record<string, number | undefined> {
   return {
     ...params,
     temperature: Math.min((params.temperature ?? 0.7) + 0.1, 2.0),

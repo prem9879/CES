@@ -31,13 +31,15 @@ feedbackRoutes.post('/', (req, res) => {
   try {
     const {
       message_id,
-      context_type,
+      context_type: raw_context_type,
       model = 'unknown',
       persona = 'default',
       rating,
       params,
       response_text,
     } = req.body
+
+    const context_type = raw_context_type as ContextType
 
     // Validate
     if (!message_id || typeof message_id !== 'string') {

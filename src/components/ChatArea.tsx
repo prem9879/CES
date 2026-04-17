@@ -4,14 +4,19 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '@/store'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
-import { ArrowDown, Droplets, Hash } from 'lucide-react'
+import { ArrowDown, Cloud, Droplets, Hash, Server, ShieldAlert } from 'lucide-react'
 
 export function ChatArea() {
+  // Use proper selectors for reactive updates
+  const currentConversation = useStore(state =>
+    state.conversations.find(c => c.id === state.currentConversationId) || null
+  )
   const {
-    currentConversation, personas, currentPersona,
+    personas,
     liquidResponseEnabled, setLiquidResponseEnabled,
     promptsTried,
-    ultraplinianEnabled, consortiumEnabled,
+    taskMode,
+    runtimeStatus,
   } = useStore()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -46,7 +51,7 @@ export function ChatArea() {
   }
 
   return (
-    <div className="flex flex-col h-screen relative">
+    <div className="relative flex h-full min-h-0 flex-col">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-theme-primary bg-theme-dim/50">
         <div className="flex items-center gap-3">
@@ -58,7 +63,7 @@ export function ChatArea() {
           </div>
           <div>
             <h2 className="font-semibold">{persona.name}</h2>
-            <p className="text-xs theme-secondary">{currentConversation.model.split('/').pop()}</p>
+            <p className="text-xs theme-secondary">{currentConversation.model.split('/').pop()} · {taskMode.toUpperCase()} MODE</p>
           </div>
         </div>
         <div className="flex items-center gap-3 text-xs theme-secondary">
@@ -93,6 +98,33 @@ export function ChatArea() {
           <span>{currentConversation.messages.length} messages</span>
         </div>
       </header>
+
+      {/* Runtime status banner */}
+      <div
+        className={`px-6 py-2 border-b text-xs flex items-center gap-2 ${
+          runtimeStatus.mode === 'cloud'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            : runtimeStatus.mode === 'proxy'
+            ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+            : 'bg-red-500/10 border-red-500/30 text-red-300'
+        }`}
+      >
+        {runtimeStatus.mode === 'cloud' ? (
+          <Cloud className="w-3.5 h-3.5" />
+        ) : runtimeStatus.mode === 'proxy' ? (
+          <Server className="w-3.5 h-3.5" />
+        ) : (
+          <ShieldAlert className="w-3.5 h-3.5" />
+        )}
+        <span className="font-semibold uppercase tracking-wide">
+          {runtimeStatus.mode === 'cloud'
+            ? 'Cloud Mode'
+            : runtimeStatus.mode === 'proxy'
+            ? 'Proxy Mode'
+            : 'Fallback Mode'}
+        </span>
+        <span className="opacity-80">{runtimeStatus.reason}</span>
+      </div>
 
       {/* Messages */}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-6 relative">

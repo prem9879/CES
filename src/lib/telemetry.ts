@@ -3,7 +3,7 @@
  *
  * Fires metadata events to the Cloudflare Pages telemetry proxy after
  * every LLM request. The proxy commits batches to the HuggingFace
- * dataset repo (pliny-the-prompter/g0dm0d3) as JSONL files.
+ * dataset repo (your-org/ces) as JSONL files.
  *
  * Privacy guarantees:
  * - NO message content, prompts, or responses
@@ -23,6 +23,20 @@ const TELEMETRY_ENDPOINT = '/api/telemetry'
 const BATCH_SIZE = 20
 const FLUSH_INTERVAL_MS = 30_000 // 30 seconds
 
+function isTelemetryEnabled(): boolean {
+  // Explicit override for local debugging.
+  if (process.env.NEXT_PUBLIC_ENABLE_TELEMETRY === 'true') return true
+
+  // Default: disable telemetry in local development to avoid noisy 404s
+  // when the Cloudflare function endpoint is not present.
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return false
+  }
+
+  return true
+}
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface TelemetryEvent {
@@ -33,7 +47,7 @@ export interface TelemetryEvent {
 }
 
 export interface ChatTelemetryData {
-  mode: 'standard' | 'ultraplinian'
+  mode: 'standard' | 'ultraplinian' | 'build'
   model: string
   duration_ms: number
   response_length: number
@@ -46,7 +60,7 @@ export interface ChatTelemetryData {
     parseltongue: boolean
     stm_modules: string[]
     strategy?: string
-    godmode: boolean
+    ces: boolean
   }
 
   // AutoTune metadata (context detection only)
@@ -113,6 +127,8 @@ function getSessionId(): string {
  * Call this after every LLM request (both standard and ULTRAPLINIAN).
  */
 export function recordChatEvent(data: ChatTelemetryData): void {
+  if (!isTelemetryEnabled()) return
+
   const event: TelemetryEvent = {
     type: 'chat_completion',
     timestamp: Date.now(),
@@ -132,6 +148,8 @@ export function recordChatEvent(data: ChatTelemetryData): void {
  * Record an arbitrary telemetry event. Fire-and-forget.
  */
 export function recordEvent(type: string, data: Record<string, unknown> = {}): void {
+  if (!isTelemetryEnabled()) return
+
   eventBuffer.push({
     type,
     timestamp: Date.now(),
@@ -149,6 +167,7 @@ export function recordEvent(type: string, data: Record<string, unknown> = {}): v
  * Call once on app startup.
  */
 export function startTelemetry(): void {
+  if (!isTelemetryEnabled()) return
   if (flushTimer) return
 
   flushTimer = setInterval(() => {
@@ -173,6 +192,7 @@ export function startTelemetry(): void {
  * Stop the periodic flush timer and flush remaining events.
  */
 export function stopTelemetry(): void {
+  if (!isTelemetryEnabled()) return
   if (flushTimer) {
     clearInterval(flushTimer)
     flushTimer = null
@@ -185,6 +205,7 @@ export function stopTelemetry(): void {
 // ── Flush ────────────────────────────────────────────────────────────
 
 function flush(): void {
+  if (!isTelemetryEnabled()) return
   if (eventBuffer.length === 0) return
 
   // Grab current buffer and reset

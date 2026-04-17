@@ -1,0 +1,24 @@
+﻿# NOTICE
+
+This repository contains a substantial rework of an AGPL-licensed upstream codebase.
+
+## License
+
+- GNU Affero General Public License v3.0 (AGPL-3.0)
+- See LICENSE for full terms.
+
+## Attribution
+
+Portions of this project are derived from prior AGPL-licensed implementation(s).
+
+## Modifications in This Rework
+
+- Introduced Cognitive Execution System (CES) architecture and module boundaries.
+- Added IntentEngine, ModeRouter, FusionEngine, DecisionEngine, ExecutionEngine, and MemoryGraph.
+- Added prompt-aware multi-agent pipeline with strategist, architect, analyst, critic, and executor agents.
+- Added runtime memory retrieval and graph-based context ranking.
+- Added CES endpoints for chat/build/decision/memory analysis.
+- Added auth and billing API scaffolding (JWT + refresh, OAuth endpoint scaffold, Stripe checkout).
+- Added redesign scaffolding for mode-based workspace with thinking panel and command palette.
+
+All derivative work remains distributed under AGPL-3.0 requirements.

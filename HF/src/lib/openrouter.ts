@@ -96,8 +96,8 @@ export async function sendMessage({
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
+      'HTTP-Referer': 'https://novaos.ai',
+      'X-Title': 'NOVAOS.AI'
     },
     body: JSON.stringify(body),
     signal
@@ -159,8 +159,8 @@ export async function* streamMessage({
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
+      'HTTP-Referer': 'https://novaos.ai',
+      'X-Title': 'NOVAOS.AI'
     },
     body: JSON.stringify(streamBody),
     signal
@@ -216,8 +216,8 @@ export async function getModels(apiKey: string): Promise<string[]> {
   const response = await fetch('https://openrouter.ai/api/v1/models', {
     headers: {
       'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://godmod3.ai',
-      'X-Title': 'GODMOD3.AI'
+      'HTTP-Referer': 'https://novaos.ai',
+      'X-Title': 'NOVAOS.AI'
     }
   })
 
@@ -277,7 +277,7 @@ export interface UltraplinianComplete {
   }
   params_used: Record<string, number | undefined>
   pipeline: {
-    godmode: boolean
+    ces: boolean
     autotune: { detected_context: string; confidence: number; reasoning: string; strategy: string } | null
     parseltongue: { triggers_found: string[]; technique_used: string; transformations_count: number } | null
     stm: { modules_applied: string[]; original_length: number; transformed_length: number } | null
@@ -296,9 +296,9 @@ export interface UltraplinianOptions {
   messages: Message[]
   openrouterApiKey: string
   apiBaseUrl: string
-  godmodeApiKey: string
+  cesApiKey: string
   tier?: 'fast' | 'standard' | 'full'
-  godmode?: boolean
+  ces?: boolean
   autotune?: boolean
   strategy?: string
   parseltongue?: boolean
@@ -320,8 +320,8 @@ export async function streamUltraplinian(
   callbacks: UltraplinianCallbacks,
 ): Promise<void> {
   const {
-    messages, openrouterApiKey, apiBaseUrl, godmodeApiKey,
-    tier = 'fast', godmode = true, autotune = true, strategy = 'adaptive',
+    messages, openrouterApiKey, apiBaseUrl, cesApiKey,
+    tier = 'fast', ces = true, autotune = true, strategy = 'adaptive',
     parseltongue = true, parseltongue_technique = 'leetspeak',
     parseltongue_intensity = 'medium', stm_modules = ['hedge_reducer', 'direct_mode'],
     signal,
@@ -330,11 +330,11 @@ export async function streamUltraplinian(
   const response = await fetch(`${apiBaseUrl}/v1/ultraplinian/completions`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${godmodeApiKey}`,
+      'Authorization': `Bearer ${cesApiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      messages, openrouter_api_key: openrouterApiKey, tier, godmode,
+      messages, openrouter_api_key: openrouterApiKey, tier, ces,
       autotune, strategy, parseltongue, parseltongue_technique,
       parseltongue_intensity, stm_modules, stream: true,
     }),

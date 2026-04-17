@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+
+# Next build outputs
+.next/
+out/
+
+# Runtime logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS/editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/*.code-workspace
+
+# Build and temp
+coverage/
+dist/
+build/
+.tmp/
+.temp/
+
+# Reports and generated artifacts
+artifacts/reports/*.json
+artifacts/reports/*.md
+
+# Local caches
+*.cache
+
+# Python cache (if used by tooling)
+__pycache__/
+*.pyc

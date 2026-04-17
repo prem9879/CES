@@ -23,7 +23,7 @@ export const hedgeReducer: STMModule = {
   name: 'Hedge Reducer',
   description: 'Reduces hedging language for more confident responses',
   version: '1.0.0',
-  author: 'G0DM0D3',
+  author: 'CES',
   enabled: false,
   transformer: (input: string) => {
     const hedges = [
@@ -61,7 +61,7 @@ export const directMode: STMModule = {
   name: 'Direct Mode',
   description: 'Removes preambles and filler phrases',
   version: '1.0.0',
-  author: 'G0DM0D3',
+  author: 'CES',
   enabled: false,
   transformer: (input: string) => {
     const preambles = [
@@ -98,7 +98,7 @@ export const casualMode: STMModule = {
   name: 'Casual Mode',
   description: 'Converts formal language to casual speech',
   version: '1.0.0',
-  author: 'G0DM0D3',
+  author: 'CES',
   enabled: false,
   transformer: (input: string) => {
     return input
@@ -143,9 +143,9 @@ export const allModules: STMModule[] = [
 export function applySTMs(text: string, modules: STMModule[]): string {
   let result = text
 
-  for (const module of modules) {
-    if (module.enabled) {
-      result = module.transformer(result, module.config)
+  for (const stmModule of modules) {
+    if (stmModule.enabled) {
+      result = stmModule.transformer(result, stmModule.config)
     }
   }
 

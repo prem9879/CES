@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in G0DM0D3, please report it responsibly.
+If you discover a security vulnerability in CES, please report it responsibly.
 
 **Please do NOT open a public GitHub issue for security vulnerabilities.**
 
@@ -19,15 +19,17 @@ If you discover a security vulnerability in G0DM0D3, please report it responsibl
 - **Initial assessment:** within 7 days
 - **Fix or mitigation:** within 30 days for critical issues
 
-### Scope
+## Scope
 
 In scope:
-- The G0DM0D3 API server (`api/`)
+
+- The CES API server (`api/`)
 - The frontend application (`src/`)
 - Docker / deployment configuration
 - Authentication and authorization logic
 
 Out of scope:
+
 - Third-party dependencies (report upstream, but let us know)
 - Social engineering attacks
 - Denial of service attacks against hosted instances
@@ -35,9 +37,9 @@ Out of scope:
 ## Supported Versions
 
 | Version | Supported |
-|---------|-----------|
-| 0.4.x   | Yes       |
-| < 0.4   | No        |
+| --- | --- |
+| 0.5.x | Yes |
+| < 0.5 | No |
 
 ## Security Design
 
@@ -46,3 +48,19 @@ Out of scope:
 - **Headers:** HSTS, CSP, X-Content-Type-Options, X-Frame-Options, Permissions-Policy
 - **Docker:** Non-root containers, minimal base images
 - **Data:** Zero PII storage, opt-in dataset collection only
+
+## Operational Security Baseline
+
+Run these checks before release:
+
+```bash
+npm run lint
+npm run build
+npm audit --omit=dev
+```
+
+## Key Management Expectations
+
+- Never commit provider secrets in source, history, or docs.
+- Use runtime environment variables for server keys.
+- BYOK mode is supported; user keys remain user-managed.

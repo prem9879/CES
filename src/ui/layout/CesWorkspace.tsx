@@ -14,9 +14,9 @@ export function CesWorkspace() {
     <div className="ces-shell h-screen w-full overflow-hidden bg-ice-gradient text-cyan-100">
       <CommandPalette />
       <FirstRunOnboarding />
-      <div className="ces-layer flex h-full min-h-0">
+      <div className="ces-layer flex h-screen min-h-0 w-full items-stretch overflow-hidden">
         <Sidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
-        <div className="ces-reveal flex-1 h-full min-h-0 min-w-0">
+        <div className="ces-reveal flex h-screen min-h-0 min-w-0 flex-1 overflow-hidden">
           <ChatArea />
         </div>
       </div>

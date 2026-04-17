@@ -1586,8 +1586,8 @@ export function ChatInput() {
   const activeMemoryCount = memoriesEnabled ? memories.filter(m => m.active).length : 0
 
   return (
-    <div className="border-t border-theme-primary bg-theme-dim/50 p-4">
-      <div className="max-w-4xl mx-auto">
+    <div className="border-t border-theme-primary bg-theme-dim/60 px-3 py-3 md:px-4 md:py-4">
+      <div className="mx-auto w-full max-w-4xl">
         {/* AutoTune live parameter display */}
         {autoTuneEnabled && displayResult && showTuneDetails && (
           <div className="mb-3 p-3 bg-theme-bg border border-theme-primary rounded-lg space-y-3">

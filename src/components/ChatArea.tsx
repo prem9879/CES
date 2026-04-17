@@ -51,9 +51,10 @@ export function ChatArea() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col px-2 py-2 md:px-4 md:py-4">
+      <div className="mx-auto flex h-full w-full max-w-6xl min-h-0 flex-col overflow-hidden rounded-2xl border border-theme-primary/35 bg-theme-dim/45 shadow-2xl backdrop-blur-sm">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-theme-primary bg-theme-dim/50">
+      <header className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-theme-primary bg-theme-dim/60">
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-lg flex items-center justify-center text-xl"
@@ -101,7 +102,7 @@ export function ChatArea() {
 
       {/* Runtime status banner */}
       <div
-        className={`px-6 py-2 border-b text-xs flex items-center gap-2 ${
+        className={`px-4 md:px-6 py-2 border-b text-xs flex items-center gap-2 ${
           runtimeStatus.mode === 'cloud'
             ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
             : runtimeStatus.mode === 'proxy'
@@ -127,7 +128,7 @@ export function ChatArea() {
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-6 relative">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-3 py-4 md:px-4 md:py-6 relative">
         {currentConversation.messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="text-6xl mb-4">{persona.emoji}</div>
@@ -144,7 +145,7 @@ export function ChatArea() {
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto space-y-4">
+          <div className="max-w-4xl mx-auto w-full space-y-4">
             {currentConversation.messages.map((message) => (
               <ChatMessage key={message.id} message={message} />
             ))}
@@ -157,7 +158,7 @@ export function ChatArea() {
       {!isNearBottom && currentConversation.messages.length > 0 && (
         <button
           onClick={scrollToBottom}
-          className="absolute bottom-24 right-6 z-10 p-2 rounded-full border border-theme-primary
+          className="absolute bottom-24 right-4 md:right-6 z-10 p-2 rounded-full border border-theme-primary
             bg-theme-dim/90 backdrop-blur-sm hover:glow-box transition-all hover:scale-110 shadow-lg"
           aria-label="Scroll to bottom"
         >
@@ -167,6 +168,7 @@ export function ChatArea() {
 
       {/* Input */}
       <ChatInput />
+      </div>
     </div>
   )
 }

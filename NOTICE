@@ -1,5 +1,7 @@
 ﻿# NOTICE
 
+Copyright (c) 2026 Prem Diwan. All rights in original CES contributions are reserved.
+
 This repository contains a substantial rework of an AGPL-licensed upstream codebase.
 
 ## License
@@ -11,6 +13,11 @@ This repository contains a substantial rework of an AGPL-licensed upstream codeb
 
 CES is an original reimplementation and productization effort inspired by earlier AGPL-licensed work.
 See [CREDITS.md](CREDITS.md) for the concise inspiration credit.
+
+## Name and Identity
+
+The software is licensed under AGPL-3.0, but the CES name and product identity are reserved branding elements.
+AGPL grants rights to the source code; it does not grant trademark rights to represent forks as the original CES project.
 
 ## Modifications in This Rework
 

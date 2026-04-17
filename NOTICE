@@ -9,7 +9,8 @@ This repository contains a substantial rework of an AGPL-licensed upstream codeb
 
 ## Attribution
 
-CES is an original reimplementation and productization effort inspired by earlier AGPL-licensed work, with one concise credit retained for that inspiration.
+CES is an original reimplementation and productization effort inspired by earlier AGPL-licensed work.
+See [CREDITS.md](CREDITS.md) for the concise inspiration credit.
 
 ## Modifications in This Rework
 

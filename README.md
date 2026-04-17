@@ -141,7 +141,7 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 
 - License: AGPL-3.0 (`LICENSE`)
 - Security policy: `SECURITY.md`
-- Attribution and derivative notice: `NOTICE`
+- Credits and derivative note: `CREDITS.md`
 
 ## Release Checklist Before Push
 
@@ -155,4 +155,4 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 ## Attribution
 
 CES is presented as the primary product and codebase in this repository.
-One concise inspiration credit is retained in `NOTICE`; all public-facing branding, UX, and release copy should remain CES-first.
+One concise inspiration credit is retained in `CREDITS.md`; all public-facing branding, UX, and release copy should remain CES-first.

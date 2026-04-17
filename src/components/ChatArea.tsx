@@ -129,7 +129,7 @@ export function ChatArea() {
       {/* Messages */}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto relative">
         {currentConversation.messages.length === 0 ? (
-          <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-center px-4 text-center md:px-6">
+          <div className="mx-auto flex h-full w-full max-w-4xl flex-col items-center justify-start px-4 pt-10 text-center md:px-6 md:pt-16">
             <div className="text-6xl mb-4">{persona.emoji}</div>
             <h3 className="text-xl font-semibold mb-2">
               Chat with {persona.name}

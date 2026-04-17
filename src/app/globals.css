@@ -14,6 +14,13 @@
   --cursor-blink: 530ms;
 }
 
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 /* Base styles */
 * {
   scrollbar-width: thin;

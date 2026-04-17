@@ -157,7 +157,7 @@ See docs/SCIENCE-INVENTIONS.md for mechanism, validation plan, and technical ris
 
 ## Security and Legal
 
-- License: AGPL-3.0 (`LICENSE`)
+- License: GNU AGPL-3.0 (`LICENSE`) - official unmodified license text
 - Security policy: `SECURITY.md`
 - Credits and derivative note: `CREDITS.md`
 - Copyright and project notice: `NOTICE`

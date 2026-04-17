@@ -51,7 +51,7 @@ export default function Home() {
   }
 
   return (
-    <main className={`theme-${theme} theme-bg theme-text min-h-screen relative overflow-hidden`}>
+    <main className={`theme-${theme} theme-bg theme-text h-dvh min-h-0 relative overflow-hidden`}>
       <CesWorkspace />
     </main>
   )

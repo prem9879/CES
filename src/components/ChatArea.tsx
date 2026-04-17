@@ -51,7 +51,7 @@ export function ChatArea() {
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col border-l border-theme-primary/25 bg-theme-dim/35">
+    <section className="relative flex h-full min-h-0 flex-col border-l border-theme-primary/25 bg-theme-dim/35">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 border-b border-theme-primary bg-theme-dim/60">
         <div className="flex items-center gap-3">
@@ -167,7 +167,7 @@ export function ChatArea() {
 
       {/* Input */}
       <ChatInput />
-    </div>
+    </section>
   )
 }
 

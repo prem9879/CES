@@ -42,4 +42,4 @@ jobs:
         run: npm run perf:lighthouse
 
       - name: Audit production dependencies
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev --audit-level=high

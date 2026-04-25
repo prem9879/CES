@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '@/store'
 import {
   Plus,
@@ -10,6 +10,8 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Search,
+  X,
   Terminal,
 } from 'lucide-react'
 import { PersonaSelector } from './PersonaSelector'
@@ -32,6 +34,21 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   } = useStore()
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+
+  const filteredConversations = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return conversations
+
+    return conversations.filter((conversation) => {
+      const haystack = [
+        conversation.title,
+        conversation.model,
+        conversation.persona,
+      ].join(' ').toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [conversations, searchQuery])
 
   const handleNewChat = () => {
     createConversation()
@@ -87,6 +104,27 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <Plus className="w-4 h-4" />
               <span>New Chat</span>
             </button>
+
+            <div className="mt-3 relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 opacity-60" />
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search chats"
+                aria-label="Search conversations"
+                className="w-full rounded-lg border border-theme-primary bg-theme-bg px-9 py-2 text-sm outline-none transition-all placeholder:theme-secondary focus:glow-box"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 opacity-70 transition-colors hover:bg-theme-accent hover:opacity-100"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Mode, Model and Persona */}
@@ -98,15 +136,17 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto p-2">
-            {conversations.length === 0 ? (
+            {filteredConversations.length === 0 ? (
               <div className="text-center py-8 theme-secondary text-sm">
                 <Terminal className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No conversations yet</p>
-                <p className="text-xs mt-1 opacity-70">Start a new chat to begin</p>
+                <p>{conversations.length === 0 ? 'No conversations yet' : 'No chats match your search'}</p>
+                <p className="text-xs mt-1 opacity-70">
+                  {conversations.length === 0 ? 'Start a new chat to begin' : 'Try a different keyword'}
+                </p>
               </div>
             ) : (
               <div className="space-y-1">
-                {conversations.map((conv) => (
+                {filteredConversations.map((conv) => (
                   <div
                     key={conv.id}
                     className={`

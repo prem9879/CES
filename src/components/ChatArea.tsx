@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react'
 import { useStore } from '@/store'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
-import { ArrowDown, Cloud, Droplets, Hash, Server, ShieldAlert } from 'lucide-react'
+import { ArrowDown, Cloud, Download, Droplets, Hash, Server, ShieldAlert } from 'lucide-react'
 
 export function ChatArea() {
   // Use proper selectors for reactive updates
@@ -35,6 +35,41 @@ export function ChatArea() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     setIsNearBottom(true)
   }, [])
+
+  const exportConversation = useCallback(() => {
+    if (!currentConversation) return
+
+    const safeTitle = currentConversation.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'conversation'
+
+    const exportedAt = new Date().toISOString()
+    const markdown = [
+      `# ${currentConversation.title}`,
+      '',
+      `- Exported: ${exportedAt}`,
+      `- Persona: ${currentConversation.persona}`,
+      `- Model: ${currentConversation.model}`,
+      '',
+      ...currentConversation.messages.flatMap((message) => [
+        `## ${message.role.toUpperCase()} · ${new Date(message.timestamp).toISOString()}`,
+        '',
+        message.content,
+        '',
+      ]),
+    ].join('\n')
+
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${safeTitle}.md`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }, [currentConversation])
 
   const handleScroll = useCallback(() => {
     setIsNearBottom(checkIfNearBottom())
@@ -96,6 +131,16 @@ export function ChatArea() {
 
           <span className="text-[10px] opacity-70">&#x2726;</span>
           <span>{currentConversation.messages.length} messages</span>
+
+          <button
+            type="button"
+            onClick={exportConversation}
+            className="ml-2 inline-flex items-center gap-1 rounded-md border border-theme-primary/40 bg-theme-dim/50 px-2 py-1 text-[10px] uppercase tracking-wide text-cyan-200 transition-all hover:glow-box"
+            title="Export chat as markdown"
+          >
+            <Download className="h-3 w-3" />
+            Export
+          </button>
         </div>
       </header>
 

@@ -16,7 +16,6 @@
  */
 
 import { Router } from 'express'
-import { v4 as uuidv4 } from 'uuid'
 import OpenAI from 'openai'
 import { computeAutoTuneParams, type AutoTuneStrategy } from '../../src/lib/autotune'
 import { applyParseltongue, type ParseltongueConfig } from '../../src/lib/parseltongue'
@@ -47,6 +46,13 @@ import { isRaceTierAllowedForPlan, resolveOptionalAuthenticatedEntitlements } fr
 export const chatRoutes = Router()
 
 const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions'
+
+function generateIdPart(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID().replace(/-/g, '').slice(0, 24)
+  }
+  return `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`.slice(0, 24)
+}
 
 function resolveOpenRouterKey(req: { body?: { openrouter_api_key?: string }; headers?: { authorization?: string | string[] } }): string {
   const fromBody = typeof req.body?.openrouter_api_key === 'string' ? req.body.openrouter_api_key : ''
@@ -522,7 +528,7 @@ chatRoutes.post('/live-weather', async (req, res) => {
 
 chatRoutes.post('/completions', async (req, res) => {
   const startTime = Date.now()
-  const completionId = `chatcmpl-${uuidv4().replace(/-/g, '').slice(0, 24)}`
+  const completionId = `chatcmpl-${generateIdPart()}`
 
   try {
     const {

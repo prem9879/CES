@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { v4 as uuidv4 } from 'uuid'
 import type { AutoTuneStrategy, AutoTuneParams, AutoTuneResult, ContextType, ContextScore, PatternMatch, ParamDelta } from '@/lib/autotune'
 import type { FeedbackState } from '@/lib/autotune-feedback'
 import { createInitialFeedbackState, processFeedback, computeHeuristics } from '@/lib/autotune-feedback'
@@ -10,6 +9,13 @@ import { CES_SYSTEM_PROMPT } from '@/lib/ces-prompt'
 import type { CESMode } from '@/core/mode-router'
 import type { MessageAttachment } from '@/types/multimodal'
 import type { WebSpecCitation } from '@/types/webspec'
+
+function generateId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `id-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
 
 // Types
 export type Theme = 'matrix' | 'hacker' | 'glyph' | 'minimal'
@@ -541,7 +547,7 @@ export const useStore = create<AppState>()(
       },
 
       createConversation: () => {
-        const id = uuidv4()
+        const id = generateId()
         const state = get()
         const newConversation: Conversation = {
           id,
@@ -574,7 +580,7 @@ export const useStore = create<AppState>()(
 
       addMessage: (conversationId, message) => {
         const state = get()
-        const msgId = uuidv4()
+        const msgId = generateId()
         set({
           conversations: state.conversations.map(c =>
             c.id === conversationId
@@ -634,7 +640,7 @@ export const useStore = create<AppState>()(
         const now = Date.now()
         const newMemory: Memory = {
           ...memory,
-          id: uuidv4(),
+          id: generateId(),
           createdAt: now,
           updatedAt: now
         }
